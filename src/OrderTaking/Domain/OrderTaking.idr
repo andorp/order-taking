@@ -268,12 +268,18 @@ record OrderAcknowledgementSent where
   orderId      : OrderId
   emailAddress : EmailAddress
 
+export
+record InvalidOrder where
+  constructor MkInvalidOrder
+  order  : OrderForm
+  errors : List ValidationError
+
 public export
 data PlacedOrderEvent
   = OrderPlacedEvent         PricedOrder
   | BillableOrderPlacedEvent BillableOrderPlaced
   | AcknowledgementSentEvent OrderAcknowledgementSent
-  | InvalidOrderRegistered   OrderForm
+  | InvalidOrderRegistered   InvalidOrder
 
 createBillingEvent : PricedOrder -> Maybe BillableOrderPlaced
 createBillingEvent pricedOrder = do
@@ -319,34 +325,30 @@ namespace PlaceOrderMonad
 
     -- Throwing some error
     Throw : PlaceOrderError -> POM a
+    Catch : POM a -> POM (Either PlaceOrderError a)
 
     -- Background computations
     ASync : POM a -> POM (Future a)
     Wait  : Future a -> POM a
-
-    -- Commands
-    CmdValidateOrder    : OrderForm   -> POM Order
-    CmdPriceOrder       : Order       -> POM PricedOrder
-    CmdAcknowledgeOrder : PricedOrder -> POM (Maybe OrderAcknowledgementSent)
 
     -- Order handling
     NewOrderId : POM OrderId
     NewOrderLineId : POM OrderLineId
 
     -- Validate Order Commands
-    CmdCheckProductCodeExists : ProductCode -> POM Bool
-    CmdCheckAddressExists     : AddressForm -> POM CheckedAddress
+    CheckProductCodeExists : ProductCode -> POM Bool
+    CheckAddressExists     : AddressForm -> POM CheckedAddress
 
     -- Price Order Commands
-    CmdGetProductPrice : ProductCode -> POM Price
+    GetProductPrice : ProductCode -> POM Price
     -- GetProductPrice : Order -> POM Price
 
     -- Acknowledgement Order Commands
-    CmdCreateOrderAcknowledgementLetter : PricedOrder -> POM HtmlString
-    CmdSendOrderAcknowledgement : OrderAcknowledgement -> POM AckSent
+    CreateOrderAcknowledgementLetter : PricedOrder -> POM HtmlString
+    SendOrderAcknowledgement : OrderAcknowledgement -> POM AckSent
 
     -- Final Events
-    CmdCreateEvents : PricedOrder -> POM (List PlacedOrderEvent)
+    CreateEvents : PricedOrder -> POM (List PlacedOrderEvent)
 
 export
 Functor POM where
@@ -402,7 +404,7 @@ createCustomerInfo customer = do
 
 toAddress : AddressForm -> POM Address
 toAddress addressForm = do
-  MkCheckedAddress checkedAddress <- CmdCheckAddressExists addressForm
+  MkCheckedAddress checkedAddress <- CheckAddressExists addressForm
   let Just addressLine1 = mkStringN 50 checkedAddress.addressLine1
       | Nothing => Throw $ ValidationErrors [AddressValidation
                                               (MkAddressLineError checkedAddress.addressLine1)]
@@ -436,7 +438,7 @@ toProductCode productCodeStr = do
       | _ => Throw $ ProductCodeError
                    $ MkProductCodeErr
                    $ "Invalid product code " ++ productCodeStr
-  True <- CmdCheckProductCodeExists productCode
+  True <- CheckProductCodeExists productCode
     | _ => Throw $ ProductCodeError
                  $ MkProductCodeErr
                  $ "Product doesn't exist " ++ productCodeStr
@@ -471,9 +473,17 @@ toValidatedOrderLine orderLineForm = do
     , quantity    = quantity
     }
 
+catchValidationErrors : POM a -> POM (Either (List ValidationError) a)
+catchValidationErrors m = do
+  r <- Catch m
+  case r of
+    Left (ValidationErrors es) => pure $ Left es
+    Left err => Throw err
+    Right x  => pure $ Right x
+
 export
-validateOrder : OrderForm -> POM Order
-validateOrder orderForm = do
+validateOrder : OrderForm -> POM (Either InvalidOrder Order)
+validateOrder orderForm = checkInvalidForm $ do
   orderId      <- NewOrderId
   customerInfo <- createCustomerInfo $ orderForm.customerInfo
   address      <- toAddress $ orderForm.shippingAddress
@@ -485,13 +495,23 @@ validateOrder orderForm = do
     , billingAddress  = MkBillingAddress address
     , orderLines      = orderLines
     }
+  where
+    checkInvalidForm : POM Order -> POM (Either InvalidOrder Order)
+    checkInvalidForm m = do
+      r <- catchValidationErrors m
+      pure $ case r of
+        Left es => Left $ MkInvalidOrder
+                    { order  = orderForm
+                    , errors = es
+                    }
+        Right n => Right n
 
 -- The Pricing Step
 
 toPricedOrderLine : OrderLine -> POM PricedOrderLine
 toPricedOrderLine orderLine = do
   let quantity = OrderQuantity.value $ orderLine.quantity
-  price <- CmdGetProductPrice $ orderLine.productCode
+  price <- GetProductPrice $ orderLine.productCode
   let linePrice = multiply price quantity
   pure $ MkPricedOrderLine
     { orderLine = orderLine
@@ -517,13 +537,13 @@ priceOrder order = do
 export
 acknowledgeOrder : PricedOrder -> POM (Maybe OrderAcknowledgementSent)
 acknowledgeOrder pricedOrder = do
-  letter <- CmdCreateOrderAcknowledgementLetter pricedOrder
+  letter <- CreateOrderAcknowledgementLetter pricedOrder
   let acknowledgement
         = MkOrderAcknowledgement
         { emailAddress = pricedOrder.customerInfo.emailAddress
         , letter       = letter
         }
-  case !(CmdSendOrderAcknowledgement acknowledgement) of
+  case !(SendOrderAcknowledgement acknowledgement) of
     Sent =>
       pure
         $ Just
@@ -534,12 +554,13 @@ acknowledgeOrder pricedOrder = do
     NotSent =>
       pure Nothing
 
-placedOrderWorkflow : OrderForm -> POM (List PlacedOrderEvent)
-placedOrderWorkflow orderForm = do
-  order       <- validateOrder orderForm
-  pricedOrder <- priceOrder order
-  ack         <- acknowledgeOrder pricedOrder
-  pure $ createEvents pricedOrder ack
+
+--placedOrderWorkflow : OrderForm -> POM (List PlacedOrderEvent)
+--placedOrderWorkflow orderForm = do
+--  order       <- validateOrder orderForm
+--  pricedOrder <- priceOrder order
+--  ack         <- acknowledgeOrder pricedOrder
+--  pure $ createEvents pricedOrder ack
 
 -- placeOrderWorkflow : Command.PlaceOrder -> POM (List PlacedOrderEvent, PlaceOrderError)
 -- placeOrderWorkflow placeOrder = do
@@ -549,4 +570,3 @@ placedOrderWorkflow orderForm = do
 -- Page 167
 -- Page 172
 -- Page 178
-

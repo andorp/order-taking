@@ -3,9 +3,11 @@ module OrderTaking.BoundedContext.PlaceOrder
 import Rango.BoundedContext.Workflow
 import OrderTaking.Domain.OrderTaking
 
--- TODO: Rename PlaceOrderState
+%default total
+
 data PlaceOrderData
   = OrderForm
+  | ValidatedOrder
   | Order
   | PricedOrder
   | InvalidOrder
@@ -13,10 +15,10 @@ data PlaceOrderData
   | Finished
 
 data Chk : PlaceOrderData -> PlaceOrderData -> PlaceOrderData -> Type where
-  CheckInvalidOrder : Chk Order InvalidOrder Order
+  CheckInvalidOrder : Chk ValidatedOrder InvalidOrder Order
 
 data Cmd : PlaceOrderData -> PlaceOrderData -> Type where
-  ValidateOrder     : Cmd OrderForm           Order
+  ValidateOrder     : Cmd OrderForm           ValidatedOrder
   AddInvalidOrder   : Cmd InvalidOrder        InvalidOrderQueued
   PriceOrder        : Cmd Order               PricedOrder
   SendAckToCustomer : Cmd PricedOrder         Finished
@@ -33,9 +35,10 @@ workflow = do
 
 poStateType : PlaceOrderData -> Type
 poStateType OrderForm          = OrderTaking.OrderForm
+poStateType ValidatedOrder     = Either OrderTaking.InvalidOrder OrderTaking.Order
 poStateType Order              = OrderTaking.Order
 poStateType PricedOrder        = OrderTaking.PricedOrder
-poStateType InvalidOrder       = OrderTaking.OrderForm
+poStateType InvalidOrder       = OrderTaking.InvalidOrder
 poStateType InvalidOrderQueued = List PlacedOrderEvent
 poStateType Finished           = List PlacedOrderEvent
 
@@ -50,7 +53,7 @@ poRunCmd SendAckToCustomer st = do
 poRunCmd SendInvalidOrder  st = pure st
 
 poRunChk : Chk s b1 b2 -> (poStateType s) -> POM (Either (poStateType b1) (poStateType b2))
-poRunChk CheckInvalidOrder st = ?poRunChk1_1
+poRunChk CheckInvalidOrder st = pure st
 
 poInterpreter : Interpreter PlaceOrderData POM Cmd Chk
 poInterpreter = MkRunner
