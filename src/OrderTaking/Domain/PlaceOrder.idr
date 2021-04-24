@@ -40,7 +40,7 @@ record CustomerInfo where
 data ZipCode = MkZipCode String
 
 mkZipCode : String -> Maybe ZipCode
-mkZipCode = ?mkZipCode1
+mkZipCode = Just . MkZipCode -- TODO
 
 record AddressForm where
   constructor MkAddressForm
@@ -195,11 +195,16 @@ data ProductCatalog = MkProductCatalog
 CalculatePrices : Type
 CalculatePrices = ProductCatalog => Order -> PricedOrder
 
+data CheckedAddressValidationError
+  = InvalidFormat String
+  | AddressNotFound String
+
 data AddressValidationError
   = MkAddressLineError String
   | MkAddressOptLineError (Maybe String)
   | MkAddressCityError String
   | MkAddressZipCodeError String
+  | CheckedAddressError CheckedAddressValidationError
 
 data NameValidationError = MkNameValidationError String String
 
@@ -329,53 +334,72 @@ namespace Command
     | Change ChangeOrder
     | Cancel CancelOrder
 
+namespace Field
+
+  public export
+  data Field : Type -> Type -> Type where
+    Error : List e -> Field e a
+    Value : a      -> Field e a
+
+  export
+  Functor (Field e) where
+    map f (Error es) = Error es
+    map f (Value x)  = Value (f x)
+
+  export
+  Applicative (Field e) where
+    pure x = Value x
+    Error es1 <*> Error es2 = Error (es1 ++ es2)
+    Error es1 <*> Value x   = Error es1
+    Value f   <*> Error es1 = Error es1
+    Value f   <*> Value x   = Value (f x)
+
+  export
+  field : a -> (a -> Maybe b) -> e -> Field e b
+  field v f e = maybe (Error [e]) Value $ f v
+
+  export
+  optionalField : Maybe a -> (a -> Maybe b) -> e -> Field e (Maybe b)
+  optionalField Nothing f e  = Value Nothing
+  optionalField (Just v) f e = Just <$> field v f e
+
+checkCustomerInfoForm : CustomerInfoForm -> Field ValidationError CustomerInfo
+checkCustomerInfoForm customer =
+  MkCustomerInfo
+    <$> (MkPersonalName
+          <$> field customer.firstName
+                    (mkStringN 50)
+                    (NameValidation (MkNameValidationError "First name" customer.firstName))
+          <*> field customer.lastName
+                    (mkStringN 50)
+                    (NameValidation (MkNameValidationError "Last name" customer.lastName)))
+    <*> field customer.emailAddress
+              mkEmailAddress
+              (EmailValidation (MkEmailValidationError customer.emailAddress))
+
 createCustomerInfo : CustomerInfoForm -> POM CustomerInfo
 createCustomerInfo customer = do
-  let Just firstName = mkStringN 50 $ customer.firstName
-      | Nothing => Throw $ ValidationErrors [NameValidation
-                                              (MkNameValidationError "First name"
-                                                                     customer.firstName)]
-  let Just lastName = mkStringN 50 $ customer.lastName
-      | Nothing => Throw $ ValidationErrors [NameValidation
-                                              (MkNameValidationError "Last name"
-                                                                     customer.lastName)]
-  let Just email = mkEmailAddress customer.emailAddress
-      | Nothing => Throw $ ValidationErrors [EmailValidation
-                                              (MkEmailValidationError customer.emailAddress)]
-  pure $ MkCustomerInfo
-    { personalName = MkPersonalName { firstName = firstName, lastName = lastName }
-    , emailAddress = email
-    }
+  let Value customerInfo = checkCustomerInfoForm customer
+      | Error es => Throw CustomerInfo $ ValidationErrors es
+  pure customerInfo
+
+checkAddressForm : AddressForm -> Field AddressValidationError Address
+checkAddressForm addr =
+  MkAddress
+    <$> field addr.addressLine1 (mkStringN 50) (MkAddressLineError addr.addressLine1)
+    <*> optionalField addr.addressLine2 (mkStringN 50) (MkAddressOptLineError addr.addressLine2)
+    <*> optionalField addr.addressLine3 (mkStringN 50) (MkAddressOptLineError addr.addressLine3)
+    <*> optionalField addr.addressLine4 (mkStringN 50) (MkAddressOptLineError addr.addressLine4)
+    <*> field addr.city (mkStringN 50) (MkAddressCityError addr.city)
+    <*> field addr.zipCode mkZipCode   (MkAddressZipCodeError addr.zipCode)
 
 toAddress : AddressForm -> POM Address
 toAddress addressForm = do
-  MkCheckedAddress checkedAddress <- CheckAddressExists addressForm
-  let Just addressLine1 = mkStringN 50 checkedAddress.addressLine1
-      | Nothing => Throw $ ValidationErrors [AddressValidation
-                                              (MkAddressLineError checkedAddress.addressLine1)]
-  let Just (Just addressLine2) = map (mkStringN 50) checkedAddress.addressLine2
-      | _ => Throw $ ValidationErrors [AddressValidation
-                                        (MkAddressOptLineError checkedAddress.addressLine2)]
-  let Just (Just addressLine3) = map (mkStringN 50) checkedAddress.addressLine3
-      | _ => Throw $ ValidationErrors [AddressValidation
-                                        (MkAddressOptLineError checkedAddress.addressLine3)]
-  let Just (Just addressLine4) = map (mkStringN 50) checkedAddress.addressLine4
-      | _ => Throw $ ValidationErrors [AddressValidation
-                                        (MkAddressOptLineError checkedAddress.addressLine4)]
-  let Just city = mkStringN 50 checkedAddress.city
-      | _ => Throw $ ValidationErrors [AddressValidation
-                                        (MkAddressCityError checkedAddress.city)]
-  let Just zipCode = mkZipCode checkedAddress.zipCode
-      | _ => Throw $ ValidationErrors [AddressValidation
-                                        (MkAddressZipCodeError checkedAddress.zipCode)]
-  pure $ MkAddress
-    { addressLine1 = addressLine1
-    , addressLine2 = Just addressLine2
-    , addressLine3 = Just addressLine3
-    , addressLine4 = Just addressLine4
-    , city         = city
-    , zipCode      = zipCode
-    }
+  Right (MkCheckedAddress checkedAddressForm) <- CheckAddressExists addressForm
+    | Left e => Throw Address $ ValidationErrors [AddressValidation $ CheckedAddressError e]
+  let Value addr = checkAddressForm checkedAddressForm
+      | Error es => Throw Address $ ValidationErrors $ map AddressValidation es
+  pure addr
 
 toProductCode : String -> POM ProductCode
 toProductCode productCodeStr = do
