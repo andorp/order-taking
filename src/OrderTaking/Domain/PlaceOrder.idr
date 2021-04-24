@@ -1,51 +1,10 @@
-module OrderTaking.Domain.OrderTaking
+module OrderTaking.Domain.PlaceOrder
 
+import OrderTaking.Domain.Prelude
 import Rango.BoundedContext.Command
 import Data.List
-import Data.Nat
 import Data.Strings
 
-
-data Result r e
-  = Ok r
-  | Error e
-
-namespace Between
-
-  export
-  data Between : (numType : Type) -> (l : numType) -> (h : numType) -> Type where
-    MkBetween : (x : numType) -> Between numType l h
-
-  export
-  mkBetween : {n : Type} -> Ord n => {l , h : n} -> (x : n) -> Maybe (Between n l h)
-  mkBetween x = do
-    let True = l <= h
-        | _ => Nothing
-    let True = l <= x
-        | _ => Nothing
-    let True = x <= h
-        | _ => Nothing
-    Just $ MkBetween x
-
-  export
-  value : Between n l h -> n
-  value (MkBetween v) = v
-
-data StringN : Nat -> Type where
-  MkStringN : (s : String) -> (0 _ : length s `LTE` m) => StringN m
-
-mkLTE : (n , m : Nat) -> Maybe (n `LTE` m)
-mkLTE 0     0     = Just LTEZero
-mkLTE 0     (S k) = Just LTEZero
-mkLTE (S k) 0     = Nothing
-mkLTE (S k) (S j) = do
-  proofLTE <- mkLTE k j
-  Just (LTESucc proofLTE)
-
-mkStringN : (n : Nat) -> String -> Maybe (StringN n)
-mkStringN n s = do
-  proofLTE <- mkLTE (length s) n
-  Just $ MkStringN s
 
 data Price = MkPrice Double
 
@@ -305,50 +264,38 @@ data ProductCodeErr = MkProductCodeErr String
 
 data AckSent = Sent | NotSent
 
-namespace PlaceOrderMonad
+public export
+data PlaceOrderError
+  = MkPlaceOrderError
+  | ValidationErrors (List ValidationError)
+  | ProductCodeError ProductCodeErr
+  | PriceOrderError PricingError
 
-  public export
-  data PlaceOrderError
-    = MkPlaceOrderError
-    | ValidationErrors (List ValidationError)
-    | ProductCodeError ProductCodeErr
-    | PriceOrderError PricingError
+export
+data POM : Type -> Type where
+  -- Monad interface
+  Pure : a -> POM a
+  Bind : POM a -> Inf (a -> POM b) -> POM b
 
-  public export
-  data Future a = MkFuture
+  -- Throwing some error
+  Throw : (a : Type) -> PlaceOrderError -> POM a
+  Catch : {a : Type} -> POM a -> POM (Either PlaceOrderError a)
 
-  public export
-  data POM : Type -> Type where
-    -- Monad interface
-    Pure : a -> POM a
-    Bind : POM a -> (a -> POM b) -> POM b
+  -- Order handling
+  NewOrderId : POM OrderId
+  NewOrderLineId : POM OrderLineId
 
-    -- Throwing some error
-    Throw : PlaceOrderError -> POM a
-    Catch : POM a -> POM (Either PlaceOrderError a)
+  -- Validate Order Commands
+  CheckProductCodeExists : ProductCode -> POM Bool
+  CheckAddressExists     : AddressForm -> POM (Either CheckedAddressValidationError CheckedAddress)
 
-    -- Background computations
-    ASync : POM a -> POM (Future a)
-    Wait  : Future a -> POM a
+  -- Price Order Commands
+  GetProductPrice : ProductCode -> POM Price
 
-    -- Order handling
-    NewOrderId : POM OrderId
-    NewOrderLineId : POM OrderLineId
+  -- Acknowledgement Order Commands
+  CreateOrderAcknowledgementLetter : PricedOrder -> POM HtmlString
+  SendOrderAcknowledgement : OrderAcknowledgement -> POM AckSent
 
-    -- Validate Order Commands
-    CheckProductCodeExists : ProductCode -> POM Bool
-    CheckAddressExists     : AddressForm -> POM CheckedAddress
-
-    -- Price Order Commands
-    GetProductPrice : ProductCode -> POM Price
-    -- GetProductPrice : Order -> POM Price
-
-    -- Acknowledgement Order Commands
-    CreateOrderAcknowledgementLetter : PricedOrder -> POM HtmlString
-    SendOrderAcknowledgement : OrderAcknowledgement -> POM AckSent
-
-    -- Final Events
-    CreateEvents : PricedOrder -> POM (List PlacedOrderEvent)
 
 export
 Functor POM where
@@ -357,9 +304,7 @@ Functor POM where
 export
 Applicative POM where
   pure = Pure
-  f <*> x = Bind f $ \f' =>
-            Bind x $ \x' =>
-            Pure (f' x')
+  f <*> x = Bind f (\f' => Bind x (\x' => Pure (f' x')))
 
 export
 Monad POM where
@@ -435,11 +380,11 @@ toAddress addressForm = do
 toProductCode : String -> POM ProductCode
 toProductCode productCodeStr = do
   let Just productCode = mkProductCode productCodeStr
-      | _ => Throw $ ProductCodeError
+      | _ => Throw ProductCode $ ProductCodeError
                    $ MkProductCodeErr
                    $ "Invalid product code " ++ productCodeStr
   True <- CheckProductCodeExists productCode
-    | _ => Throw $ ProductCodeError
+    | _ => Throw ProductCode $ ProductCodeError
                  $ MkProductCodeErr
                  $ "Product doesn't exist " ++ productCodeStr
   pure productCode
@@ -447,18 +392,18 @@ toProductCode productCodeStr = do
 toOrderQuantity : ProductCode -> String -> POM OrderQuantity
 toOrderQuantity (WidgetProduct wp) quantity = do
   let Just integer = the (Maybe Integer) $ parseInteger quantity
-      | _ => Throw $ ValidationErrors [QuantityValidation
+      | _ => Throw OrderQuantity $ ValidationErrors [QuantityValidation
                                         (MkQuantityValidationError "Integer" quantity)]
   let Just between = mkBetween integer
-      | _ => Throw $ ValidationErrors [QuantityValidation
+      | _ => Throw OrderQuantity $ ValidationErrors [QuantityValidation
                                         (MkQuantityValidationError "in between" quantity)]
   pure $ OrderUnitQuantity $ MkUnitQuantity between
 toOrderQuantity (GizmoProduct gp) quantity = do
   let Just double = parseDouble quantity
-      | _ => Throw $ ValidationErrors [QuantityValidation
+      | _ => Throw OrderQuantity $ ValidationErrors [QuantityValidation
                                         (MkQuantityValidationError "Double" quantity)]
   let Just between = mkBetween double
-      | _ => Throw $ ValidationErrors [QuantityValidation
+      | _ => Throw OrderQuantity $ ValidationErrors [QuantityValidation
                                         (MkQuantityValidationError "in between" quantity)]
   pure $ OrderKilogramQuantity $ MkKilogramQuantity between
 
@@ -473,12 +418,12 @@ toValidatedOrderLine orderLineForm = do
     , quantity    = quantity
     }
 
-catchValidationErrors : POM a -> POM (Either (List ValidationError) a)
+catchValidationErrors : {a : Type} -> POM a -> POM (Either (List ValidationError) a)
 catchValidationErrors m = do
   r <- Catch m
   case r of
     Left (ValidationErrors es) => pure $ Left es
-    Left err => Throw err
+    Left err => Throw (Either (List ValidationError) a) err
     Right x  => pure $ Right x
 
 export
@@ -554,19 +499,8 @@ acknowledgeOrder pricedOrder = do
     NotSent =>
       pure Nothing
 
-
---placedOrderWorkflow : OrderForm -> POM (List PlacedOrderEvent)
---placedOrderWorkflow orderForm = do
---  order       <- validateOrder orderForm
---  pricedOrder <- priceOrder order
---  ack         <- acknowledgeOrder pricedOrder
---  pure $ createEvents pricedOrder ack
-
--- placeOrderWorkflow : Command.PlaceOrder -> POM (List PlacedOrderEvent, PlaceOrderError)
--- placeOrderWorkflow placeOrder = do
---  ?placeOrderCommand
-
 -- Page 142
 -- Page 167
 -- Page 172
 -- Page 178
+-- Page 195

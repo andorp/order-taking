@@ -1,7 +1,7 @@
 module OrderTaking.BoundedContext.PlaceOrder
 
 import Rango.BoundedContext.Workflow
-import OrderTaking.Domain.OrderTaking
+import OrderTaking.Domain.PlaceOrder
 
 %default total
 
@@ -33,31 +33,30 @@ workflow = do
     (do Do PriceOrder
         Do SendAckToCustomer)
 
-poStateType : PlaceOrderData -> Type
-poStateType OrderForm          = OrderTaking.OrderForm
-poStateType ValidatedOrder     = Either OrderTaking.InvalidOrder OrderTaking.Order
-poStateType Order              = OrderTaking.Order
-poStateType PricedOrder        = OrderTaking.PricedOrder
-poStateType InvalidOrder       = OrderTaking.InvalidOrder
-poStateType InvalidOrderQueued = List PlacedOrderEvent
-poStateType Finished           = List PlacedOrderEvent
+POStateType : PlaceOrderData -> Type
+POStateType OrderForm          = PlaceOrder.OrderForm
+POStateType ValidatedOrder     = Either PlaceOrder.InvalidOrder PlaceOrder.Order
+POStateType Order              = PlaceOrder.Order
+POStateType PricedOrder        = PlaceOrder.PricedOrder
+POStateType InvalidOrder       = PlaceOrder.InvalidOrder
+POStateType InvalidOrderQueued = List PlacedOrderEvent
+POStateType Finished           = List PlacedOrderEvent
 
-poRunCmd : Cmd s e -> (poStateType s) -> POM (poStateType e)
-poRunCmd ValidateOrder     st = OrderTaking.validateOrder st
-poRunCmd AddInvalidOrder   st = do
-  pure [InvalidOrderRegistered st]
-poRunCmd PriceOrder        st = OrderTaking.priceOrder st
+poRunCmd : Cmd s e -> (POStateType s) -> POM (POStateType e)
+poRunCmd ValidateOrder     st = validateOrder st
+poRunCmd AddInvalidOrder   st = pure [InvalidOrderRegistered st]
+poRunCmd PriceOrder        st = priceOrder st
 poRunCmd SendAckToCustomer st = do
-  ack <- OrderTaking.acknowledgeOrder st
-  pure $ OrderTaking.createEvents st ack
+  ack <- acknowledgeOrder st
+  pure $ createEvents st ack
 poRunCmd SendInvalidOrder  st = pure st
 
-poRunChk : Chk s b1 b2 -> (poStateType s) -> POM (Either (poStateType b1) (poStateType b2))
+poRunChk : Chk s b1 b2 -> (POStateType s) -> POM (Either (POStateType b1) (POStateType b2))
 poRunChk CheckInvalidOrder st = pure st
 
 poInterpreter : Interpreter PlaceOrderData POM Cmd Chk
 poInterpreter = MkRunner
-  { stateType  = poStateType
+  { StateType  = POStateType
   , runCommand = poRunCmd
   , runCheck   = poRunChk
   }

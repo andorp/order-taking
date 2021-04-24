@@ -1,6 +1,6 @@
 module Main
 
-import OrderTaking.Domain.OrderTaking
+import OrderTaking.Domain.PlaceOrder
 import OrderTaking.BoundedContext.PlaceOrder
 
 main : IO ()

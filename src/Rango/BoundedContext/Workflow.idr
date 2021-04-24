@@ -33,14 +33,14 @@ record Interpreter
         (0 chk : state -> state -> state -> Type)
   where
     constructor MkRunner
-    stateType
+    StateType
       : state -> Type
     runCommand
-      : {0 s,e : state} -> cmd s e -> (stateType s) -> m (stateType e)
+      : {0 s,e : state} -> cmd s e -> (StateType s) -> m (StateType e)
     runCheck
       :  {0 s,b1,b2 : state}
       -> chk s b1 b2
-      -> (stateType s) -> m (Either (stateType b1) (stateType b2))
+      -> (StateType s) -> m (Either (StateType b1) (StateType b2))
 
 run
   :  Functor m
@@ -48,8 +48,8 @@ run
   => Monad m
   => (r : Interpreter state m cmd chk)
   -> Workflow cmd chk start end
-  -> (stateType r start)
-  -> m (stateType r end)
+  -> (StateType r start)
+  -> m (StateType r end)
 run r (Do cmd) i = runCommand r cmd i
 run r (m1 >> m2) i = do
   x <- run r m1 i
