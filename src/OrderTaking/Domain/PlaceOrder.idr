@@ -314,7 +314,47 @@ Applicative POM where
 export
 Monad POM where
   join  m = Bind m id
-  (>>=)   = Bind
+  m >>= k = Bind m k
+
+record POMInterpreter (m : Type -> Type) where
+  constructor MkPOMInterpreter
+  throw
+    : {1 a : Type} -> PlaceOrderError -> m a
+  catch
+    : {a : Type} -> m a -> m (Either PlaceOrderError a)
+    -- {2 a : Type} -> m a -> m (Either PlaceOrderError a)
+  newOrderId
+    : m OrderId
+  newOrderLineId
+    : m OrderLineId
+  checkProductCodeExists
+    : ProductCode -> m Bool
+  checkAddressExists
+    : AddressForm -> m (Either CheckedAddressValidationError CheckedAddress)
+  getProductPrice
+    : ProductCode -> m Price
+  createOrderAcknowledgementLetter
+    : PricedOrder -> m HtmlString
+  sendOrderAcknowledgement
+    : OrderAcknowledgement -> m AckSent
+
+runPOM
+  :  Monad m
+  => POMInterpreter m
+  -> POM a
+  -> m a
+runPOM interpreter (Pure x)                   = pure x
+runPOM interpreter (Bind m k)                 = runPOM interpreter m >>= (runPOM interpreter . k)
+runPOM interpreter (Throw a x)                = interpreter.throw x
+runPOM interpreter (Catch x)                  = interpreter.catch (runPOM interpreter x)
+runPOM interpreter NewOrderId                 = interpreter.newOrderId
+runPOM interpreter NewOrderLineId             = interpreter.newOrderLineId
+runPOM interpreter (CheckProductCodeExists x) = interpreter.checkProductCodeExists x
+runPOM interpreter (CheckAddressExists x)     = interpreter.checkAddressExists x
+runPOM interpreter (GetProductPrice x)        = interpreter.getProductPrice x
+runPOM interpreter (CreateOrderAcknowledgementLetter x) =
+  interpreter.createOrderAcknowledgementLetter x
+runPOM interpreter (SendOrderAcknowledgement x) = interpreter.sendOrderAcknowledgement x
 
 namespace Command
   public export
