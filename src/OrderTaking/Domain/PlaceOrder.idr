@@ -2,6 +2,7 @@ module OrderTaking.Domain.PlaceOrder
 
 import OrderTaking.Domain.Prelude
 import Rango.BoundedContext.Command
+import Data.Either
 import Data.List
 import Data.Strings
 
@@ -232,11 +233,14 @@ record OrderAcknowledgementSent where
   orderId      : OrderId
   emailAddress : EmailAddress
 
+data ProductCodeErr = MkProductCodeErr String
+
 export
 record InvalidOrder where
   constructor MkInvalidOrder
-  order  : OrderForm
-  errors : List ValidationError
+  order             : OrderForm
+  validationErrors  : List ValidationError
+  productCodeErrors : List ProductCodeErr
 
 public export
 data PlacedOrderEvent
@@ -265,9 +269,21 @@ createEvents pricedOrder orderAcknowledgementSent = catMaybes
 
 data PricingError = MkPricingError
 
-data ProductCodeErr = MkProductCodeErr String
-
 data AckSent = Sent | NotSent
+
+data Uri = MkUri String
+
+record ServiceInfo where
+  constructor MkServiceInfo
+  name     : String
+  endpoint : Uri
+
+data Exception = MkException String
+
+record RemoteServiceError where
+  constructor MkRemoteServiceError
+  serviceInfo : ServiceInfo
+  exception : Exception
 
 public export
 data PlaceOrderError
@@ -275,6 +291,16 @@ data PlaceOrderError
   | ValidationErrors (List ValidationError)
   | ProductCodeError ProductCodeErr
   | PriceOrderError PricingError
+  | RemoteServiceErr RemoteServiceError
+
+maybeValidationErrors : PlaceOrderError -> Maybe (List ValidationError)
+maybeValidationErrors (ValidationErrors es) = Just es
+maybeValidationErrors _ = Nothing
+
+maybeProductCodeError : PlaceOrderError -> Maybe ProductCodeErr
+maybeProductCodeError (ProductCodeError e) = Just e
+maybeProductCodeError _ = Nothing
+
 
 export
 data POM : Type -> Type where
@@ -444,13 +470,15 @@ toAddress addressForm = do
 toProductCode : String -> POM ProductCode
 toProductCode productCodeStr = do
   let Just productCode = mkProductCode productCodeStr
-      | _ => Throw ProductCode $ ProductCodeError
-                   $ MkProductCodeErr
-                   $ "Invalid product code " ++ productCodeStr
+      | _ => Throw ProductCode
+              $ ProductCodeError
+              $ MkProductCodeErr
+              $ "Invalid product code " ++ productCodeStr
   True <- CheckProductCodeExists productCode
-    | _ => Throw ProductCode $ ProductCodeError
-                 $ MkProductCodeErr
-                 $ "Product doesn't exist " ++ productCodeStr
+    | _ => Throw ProductCode
+            $ ProductCodeError
+            $ MkProductCodeErr
+            $ "Product doesn't exist " ++ productCodeStr
   pure productCode
 
 toOrderQuantity : ProductCode -> String -> POM OrderQuantity
@@ -482,38 +510,28 @@ toValidatedOrderLine orderLineForm = do
     , quantity    = quantity
     }
 
-catchValidationErrors : {a : Type} -> POM a -> POM (Either (List ValidationError) a)
-catchValidationErrors m = do
-  r <- Catch m
-  case r of
-    Left (ValidationErrors es) => pure $ Left es
-    Left err => Throw (Either (List ValidationError) a) err
-    Right x  => pure $ Right x
-
 export
 validateOrder : OrderForm -> POM (Either InvalidOrder Order)
-validateOrder orderForm = checkInvalidForm $ do
+validateOrder orderForm = do
   orderId      <- NewOrderId
   customerInfo <- createCustomerInfo $ orderForm.customerInfo
   address      <- toAddress $ orderForm.shippingAddress
-  orderLines   <- traverse toValidatedOrderLine orderForm.orderLines
-  pure $ MkOrder
-    { orderId         = orderId
-    , customerInfo    = customerInfo
-    , shippingAddress = MkShippingAddress address
-    , billingAddress  = MkBillingAddress address
-    , orderLines      = orderLines
-    }
-  where
-    checkInvalidForm : POM Order -> POM (Either InvalidOrder Order)
-    checkInvalidForm m = do
-      r <- catchValidationErrors m
-      pure $ case r of
-        Left es => Left $ MkInvalidOrder
-                    { order  = orderForm
-                    , errors = es
-                    }
-        Right n => Right n
+  orderLines   <- traverse (Catch . toValidatedOrderLine) orderForm.orderLines
+  pure $ case partitionEithers orderLines of
+    ([], orderLines)
+      => Right $ MkOrder
+          { orderId         = orderId
+          , customerInfo    = customerInfo
+          , shippingAddress = MkShippingAddress address
+          , billingAddress  = MkBillingAddress address
+          , orderLines      = orderLines
+          }
+    (errors, orderLines)
+      => Left $ MkInvalidOrder
+          { order  = orderForm
+          , validationErrors = concat $ mapMaybe maybeValidationErrors errors
+          , productCodeErrors = mapMaybe maybeProductCodeError errors
+          }
 
 -- The Pricing Step
 
@@ -568,3 +586,4 @@ acknowledgeOrder pricedOrder = do
 -- Page 172
 -- Page 178
 -- Page 195
+-- Page 220
