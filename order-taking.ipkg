@@ -1,8 +1,0 @@
-package order-taking
-
-depends = idris2, contrib, network
-
-sourcedir = "src"
-
-main = Main
-executable = order-taking

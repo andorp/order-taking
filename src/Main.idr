@@ -1,7 +1,8 @@
-module Main
+module OrderTakingService
 
-import OrderTaking.Domain.PlaceOrder
-import OrderTaking.BoundedContext.PlaceOrder
+-- import Service.NodeJS
+-- import OrderTaking.Domain.PlaceOrder
+-- import OrderTaking.BoundedContext.PlaceOrder
 
 main : IO ()
-main = putStrLn "Order taking."
+main = putStrLn "Hello Something!"

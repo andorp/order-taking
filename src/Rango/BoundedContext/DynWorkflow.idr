@@ -44,7 +44,7 @@ export
 (>>) m k = m >>= (\() => k)
 
 public export
-record Interpreter
+record Morphism
         state
         (0 m : Type -> Type)
         (0 cmd : state -> state -> Type)
@@ -52,38 +52,38 @@ record Interpreter
         (0 chk : state -> state -> state -> Type)
   where
     constructor MkRunner
-    stateType
+    StateType
       : state -> Type
-    runCommand
-      : {0 s,e : state} -> cmd s e -> (stateType s) -> m (stateType e)
-    runObserve
-      : {0 t : Type} -> {0 s,e : state} -> obs s e t -> (stateType s) -> m (t, stateType e)
-    runCheck
+    command
+      : {0 s,e : state} -> cmd s e -> (StateType s) -> m (StateType e)
+    observe
+      : {0 t : Type} -> {0 s,e : state} -> obs s e t -> (StateType s) -> m (t, StateType e)
+    check
       :  {0 s,b1,b2 : state}
       -> chk s b1 b2
-      -> (stateType s) -> m (Either (stateType b1) (stateType b2))
+      -> (StateType s) -> m (Either (StateType b1) (StateType b2))
 
 export
-run
+morph
   :  Functor m
   => Applicative m
   => Monad m
-  => (r : Interpreter state m cmd obs chk)
+  => (r : Morphism state m cmd obs chk)
   -> DynWorkflow t cmd obs chk start end
-  -> (stateType r start)
-  -> m (x : t ** stateType r (end x))
-run r (Pure x) i = pure (x ** i)
-run r (Do cmd) i = do
-  o <- runCommand r cmd i
+  -> (StateType r start)
+  -> m (x : t ** StateType r (end x))
+morph r (Pure x) i = pure (x ** i)
+morph r (Do cmd) i = do
+  o <- command r cmd i
   pure (() ** o)
-run r (Observe obs) i = do
-  (x, o) <- runObserve r obs i
+morph r (Observe obs) i = do
+  (x, o) <- observe r obs i
   pure (x ** o)
-run r (Branch h b1 b2) i = do
-  x <- runCheck r h i
+morph r (Branch h b1 b2) i = do
+  x <- check r h i
   case x of
-    Left y => run r b1 y
-    Right y => run r b2 y
-run r (m >>= k) i = do
-  (x ** md) <- run r m i
-  run r (k x) md
+    Left y => morph r b1 y
+    Right y => morph r b2 y
+morph r (m >>= k) i = do
+  (x ** md) <- morph r m i
+  morph r (k x) md

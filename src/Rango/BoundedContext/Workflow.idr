@@ -26,36 +26,36 @@ data Workflow
       -> Workflow cmd chk pre post
 
 public export
-record Interpreter
+record Morphism
         state
         (0 m : Type -> Type)
         (0 cmd : state -> state -> Type)
         (0 chk : state -> state -> state -> Type)
   where
-    constructor MkRunner
+    constructor MkMorphism
     StateType
       : state -> Type
-    runCommand
+    command
       : {0 s,e : state} -> cmd s e -> (StateType s) -> m (StateType e)
-    runCheck
+    check
       :  {0 s,b1,b2 : state}
       -> chk s b1 b2
       -> (StateType s) -> m (Either (StateType b1) (StateType b2))
 
-run
+morph
   :  Functor m
   => Applicative m
   => Monad m
-  => (r : Interpreter state m cmd chk)
+  => (r : Morphism state m cmd chk)
   -> Workflow cmd chk start end
-  -> (StateType r start)
-  -> m (StateType r end)
-run r (Do cmd) i = runCommand r cmd i
-run r (m1 >> m2) i = do
-  x <- run r m1 i
-  run r m2 x
-run r (Branch h b1 b2) i = do
-  x <- runCheck r h i
+  -> (StateType r start) -> m (StateType r end)
+morph r (Do cmd) i = command r cmd i
+morph r (m1 >> m2) i = do
+  x <- morph r m1 i
+  morph r m2 x
+morph r (Branch h b1 b2) i = do
+  x <- check r h i
   case x of
-    Left y  => run r b1 y
-    Right y => run r b2 y
+    Left y  => morph r b1 y
+    Right y => morph r b2 y
+

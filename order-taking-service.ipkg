@@ -1,0 +1,10 @@
+package order-taking-service
+
+depends = idris2, contrib, network
+
+opts = "profile"
+
+sourcedir = "src"
+
+main = OrderTakingService
+executable = order-taking-service

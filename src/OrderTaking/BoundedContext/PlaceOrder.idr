@@ -54,10 +54,10 @@ poRunCmd SendInvalidOrder  st = pure st
 poRunChk : Chk s b1 b2 -> (POStateType s) -> POM (Either (POStateType b1) (POStateType b2))
 poRunChk CheckInvalidOrder st = pure st
 
-poInterpreter : Interpreter PlaceOrderData POM Cmd Chk
-poInterpreter = MkRunner
-  { StateType  = POStateType
-  , runCommand = poRunCmd
-  , runCheck   = poRunChk
+poInterpreter : Morphism PlaceOrderData POM Cmd Chk
+poInterpreter = MkMorphism
+  { StateType = POStateType
+  , command   = poRunCmd
+  , check     = poRunChk
   }
 
