@@ -67,11 +67,13 @@ data ShippingAddress = MkShippingAddress Address
 
 data BillingAddress = MkBillingAddress Address
 
+public export
 data WidgetCode = MkWidgetCode String
 
 mkWidgetCode : String -> Maybe WidgetCode
 mkWidgetCode = Just . MkWidgetCode -- TODO
 
+public export
 data GizmoCode = MkGizmoCode String
 
 mkGizmoCode : String -> Maybe GizmoCode
@@ -128,10 +130,10 @@ namespace OrderQuantity
   value (OrderKilogramQuantity (MkKilogramQuantity x)) = Between.value x
 
 public export
-data OrderId = MkOrderId
+data OrderId = MkOrderId String
 
 public export
-data OrderLineId = MkOrderLineId
+data OrderLineId = MkOrderLineId String
 
 record OrderLine where
   constructor MkOrderLine
@@ -614,23 +616,3 @@ acknowledgeOrder pricedOrder = do
 -- Page 178
 -- Page 195
 -- Page 220
--- where does the profile information go?
--- something goes reaaly wrong, lets see what happens here
-
-nat : Nat -> Nat
-nat Z = Z
-nat (S k) = S (nat k)
--- s is seomthing
--- this is something else
--- or this
--- is thie better any bit?
--- test:w
--- anything?
--- is this good?
-
-mmap : (a -> b) -> List a -> List b
-mmap f [] = []
-mmap f (x :: xs) = f x :: mmap f xs
-
-
-

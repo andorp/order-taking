@@ -1,6 +1,11 @@
 idris2 = idris2
 node = node
 
+init: FORCE
+	test -d db    || mkdir db
+	test -d build || mkdir build
+	touch service/order-taking-service.js
+
 build: src order-taking-service.ipkg FORCE
 	$(idris2) --typecheck order-taking-service.ipkg --codegen node
 
@@ -11,6 +16,9 @@ watch:
 
 clean-lsp-log:
 	rm ~/.cache/nvim/lsp.log
+
+clean-db:
+	rm -r db
 
 clean:
 	$(idris2) --clean order-taking-service.ipkg
@@ -23,14 +31,12 @@ nodejs:
 	$(idris2) --clean order-taking-service.ipkg
 	$(idris2) --build order-taking-service.ipkg --codegen node
 
-start: clean nodejs
-	touch service/order-taking-service.js
+start: init clean nodejs
 	rm service/order-taking-service.js
 	cp build/exec/order-taking-service service/order-taking-service.js
 	$(node) service/order-taking-service.js
 
-start-opt: clean nodejs
-	touch service/order-taking-service.js
+start-opt: init clean nodejs
 	rm service/order-taking-service.js
 	cp build/exec/order-taking-service service/order-taking-service.js
 	npx google-closure-compiler service/order-taking-service.js \

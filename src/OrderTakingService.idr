@@ -5,6 +5,8 @@ import OrderTaking.BoundedContext.PlaceOrder
 import Service.NodeJS.HTTP
 import Service.NodeJS.SQLite
 import Service.NodeJS.MD5
+import OrderTaking.Database.Order
+import OrderTaking.Database.Product
 import OrderTaking.Domain.Backend
 import Language.JSON
 
@@ -55,9 +57,16 @@ main2 = do
   Database.each db selectUser onRow onCompleted
   Database.close db
 
-main : IO ()
-main = do
+main3 : IO ()
+main3 = do
   putStrLn "Start MD5 test."
   md5 <- MD5.require
   putStrLn $ !(MD5.create md5 "message")
 
+main4 : IO ()
+main4 = do
+  Database.Order.initDB
+  Database.Product.initDB
+
+main : IO ()
+main = main4

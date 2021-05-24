@@ -1,2 +1,8 @@
 *.ibc
 *.o
+build/
+db/
+node_modules/
+package-lock.json
+package.json
+service/

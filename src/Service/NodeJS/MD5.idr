@@ -7,13 +7,12 @@ data MD5 : Type where [external]
 ffi_require : () -> PrimIO MD5
 
 export
-require : IO MD5
+require : HasIO io => io MD5
 require = primIO (ffi_require ())
 
 %foreign "node:lambda: (m,s) => m(s)"
 ffi_create : MD5 -> String -> PrimIO String
 
 export
-create : MD5 -> String -> IO String
+create : HasIO io => MD5 -> String -> io String
 create m s = primIO (ffi_create m s)
-
