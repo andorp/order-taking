@@ -1,8 +1,8 @@
 module OrderTaking.Domain.Backend
 
-import Data.String
 import Control.Monad.Either
 import Control.Monad.Reader
+import Data.String
 import System.Random
 
 import OrderTaking.Domain.PlaceOrder
@@ -10,7 +10,6 @@ import OrderTaking.Database.Product
 
 import Service.NodeJS.SQLite
 import Service.NodeJS.MD5
-
 
 record Dependencies where
   constructor MkDependencies
@@ -37,6 +36,7 @@ mkRunBackend = do
 
 newOrderId : Backend OrderId
 newOrderId = do
+  -- TODO: Add timestamp
   d   <- map (the Double) randomIO
   md5 <- asks md5Provider
   oid <- MD5.create md5 (show d)
@@ -44,6 +44,7 @@ newOrderId = do
 
 newOrderLineId : Backend OrderLineId
 newOrderLineId = do
+  -- TODO: Add timestamp
   d    <- map (the Double) randomIO
   md5  <- asks md5Provider
   olid <- MD5.create md5 (show d)
