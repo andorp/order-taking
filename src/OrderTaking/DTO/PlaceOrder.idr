@@ -6,14 +6,13 @@ import Rango.DataTransfer.SQL.Derive
 %language ElabReflection
 %default total
 
-
 public export
 record AddressDTO where
   constructor MkAddressDTO
   addressLine1 : String
-  addressLine2 : Maybe String
-  addressLine3 : Maybe String
-  addressLine4 : Maybe String
+  addressLine2 : (Maybe String)
+  addressLine3 : (Maybe String)
+  addressLine4 : (Maybe String)
   city         : String
   zipCode      : String
 
@@ -48,3 +47,18 @@ record OrderFormDTO where
 %runElab deriveSQL `{{OrderLineDTO}}
 %runElab deriveSQL `{{CustomerInfoDTO}}
 %runElab deriveSQL `{{OrderFormDTO}}
+
+Identifier : Type
+Identifier = String
+
+-- TODO: HKD framework for SQL like data transfer
+public export
+record AddressHKDTO (field : Type -> Type) where
+  constructor MkAddressHKDTO
+  identifier   : field Identifier
+  addressLine1 : field String
+  addressLine2 : field (Maybe String)
+  addressLine3 : field (Maybe String)
+  addressLine4 : field (Maybe String)
+  city         : field String
+  zipCode      : field String

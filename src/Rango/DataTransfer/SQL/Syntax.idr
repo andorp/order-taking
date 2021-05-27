@@ -1,5 +1,7 @@
 module Rango.DataTransfer.SQL.Syntax
 
+import Data.String
+import Data.List
 import Data.Vect
 
 public export
@@ -30,12 +32,11 @@ data Modifier
   | NotNull
 
 public export
-data Field : Type where
-  MkField
-    :  (name      : FieldName)
-    -> (sqlType   : SQLType)
-    -> (modifiers : List Modifier)
-    -> Field
+record Field where
+  constructor MkField
+  name      : FieldName
+  sqlType   : SQLType
+  modifiers : List Modifier
 
 public export
 data Constraint : Type where
@@ -75,6 +76,32 @@ data Command : Type where
     -> (values : ValueList fields)
     -> Command
 
+renderSQLType : SQLType -> String
+renderSQLType SQL_Integer = "INTEGER"
+renderSQLType SQL_Number  = "NUMBER"
+renderSQLType SQL_Text    = "TEXT"
+
+renderModifier : Modifier -> String
+renderModifier PrimaryKey    = "PRIMARY KEY"
+renderModifier AutoIncrement = "AUTOINCREMENT"
+renderModifier NotNull       = "NOT NULL"
+
+withCommas : List String -> String
+withCommas xs = concat (intersperse ", " xs)
+
+renderConstraint : Constraint -> String
+renderConstraint (Unique name fields) =
+  "CONSTRAINT \{name} UNIQUE(\{withCommas fields})"
+renderConstraint (ForeignKey field foreignTable foreignField) =
+  "FOREIGN KEY(\{field}) REFERENCES \{foreignTable}(\{foreignField})"
+
+renderCreateField : Field -> String
+renderCreateField (MkField name sqlType modifiers) =
+  name ++ " " ++ renderSQLType sqlType ++ " " ++ unwords (map renderModifier modifiers)
+
 export
 renderCommand : Command -> String
-renderCommand = ?rc1
+renderCommand (CreateTable table fields constraints) =
+  "CREATE TABLE \{table} (\{withCommas (map renderCreateField fields ++ map renderConstraint constraints)})"
+renderCommand (Select fields table filters) = "SOMETHING"
+renderCommand (Insert table fields values) = "SOMETHING"

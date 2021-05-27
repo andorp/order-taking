@@ -19,7 +19,7 @@ namespace Error
   toString : Error -> IO String
   toString e = primIO (ffi_toString e)
 
-  %foreign "node:lambda: e => {if(e){return BigInt(1);}else{return BigInt(0);}}"
+  %foreign "node:lambda: e => {if(e){return BigInt(0);}else{return BigInt(1);}}"
   ffi_isNull : Error -> PrimIO Bool
 
   isNull : Error -> IO Bool
@@ -37,7 +37,7 @@ namespace Row
   export
   data Row : Type where [external]
 
-  %foreign "node:lambda: r => {if(r){return BigInt(1);}else{return BigInt(0);}}"
+  %foreign "node:lambda: r => {if(r){return BigInt(0);}else{return BigInt(1);}}"
   ffi_isNull : Row -> PrimIO Bool
 
   isNull : Row -> IO Bool
