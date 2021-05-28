@@ -1,11 +1,10 @@
 module OrderTaking.Domain.PlaceOrder
 
-import OrderTaking.Domain.Prelude
-import Rango.BoundedContext.Command
 import Data.Either
 import Data.List
 import Data.Strings
-
+import OrderTaking.Domain.Prelude
+import Rango.BoundedContext.Command
 
 export
 data Price = MkPrice Double
@@ -34,6 +33,7 @@ record PersonalName where
   firstName : StringN 50
   lastName  : StringN 50
 
+public export
 record CustomerInfo where
   constructor MkCustomerInfo
   personalName : PersonalName
@@ -54,6 +54,7 @@ record AddressForm where
   city         : String
   zipCode      : String
 
+public export
 record Address where
   constructor MkAddress
   addressLine1 : StringN 50
@@ -63,8 +64,10 @@ record Address where
   city         : StringN 50
   zipCode      : ZipCode
 
+public export
 data ShippingAddress = MkShippingAddress Address
 
+public export
 data BillingAddress = MkBillingAddress Address
 
 public export
@@ -157,7 +160,7 @@ record PricedOrderLine where
   orderLine : OrderLine
   linePrice : Price
 
-export
+public export
 record PricedOrder where
   constructor MkPricedOrder
   orderId         : OrderId
@@ -271,14 +274,6 @@ createBillingEvent pricedOrder = do
                   }
      else Nothing
 
-export
-createEvents : PricedOrder -> Maybe OrderAcknowledgementSent -> List PlacedOrderEvent
-createEvents pricedOrder orderAcknowledgementSent = catMaybes
-  [ Just $ OrderPlacedEvent pricedOrder
-  , map AcknowledgementSentEvent orderAcknowledgementSent
-  , map BillableOrderPlacedEvent $ createBillingEvent pricedOrder
-  ]
-
 data PricingError = MkPricingError
 
 public export
@@ -342,11 +337,11 @@ data POM : Type -> Type where
 
   -- Price Order Commands
   GetProductPrice : ProductCode -> POM Price
+  PlacePricedOrder : PricedOrder -> POM ()
 
   -- Acknowledgement Order Commands
   CreateOrderAcknowledgementLetter : PricedOrder -> POM HtmlString
   SendOrderAcknowledgement : OrderAcknowledgement -> POM AckSent
-
 
 export
 Functor POM where
@@ -385,6 +380,8 @@ record Model (m : Type -> Type) where
     : AddressForm -> m (Either CheckedAddressValidationError CheckedAddress)
   getProductPrice
     : ProductCode -> m Price
+  placePricedOrder
+    : PricedOrder -> m ()
   createOrderAcknowledgementLetter
     : PricedOrder -> m HtmlString
   sendOrderAcknowledgement
@@ -402,6 +399,7 @@ interpret model NewOrderLineId                       = model.newOrderLineId
 interpret model (CheckProductCodeExists x)           = model.checkProductCodeExists x
 interpret model (CheckAddressExists x)               = model.checkAddressExists x
 interpret model (GetProductPrice x)                  = model.getProductPrice x
+interpret model (PlacePricedOrder x)                 = model.placePricedOrder x
 interpret model (CreateOrderAcknowledgementLetter x) = model.createOrderAcknowledgementLetter x
 interpret model (SendOrderAcknowledgement x)         = model.sendOrderAcknowledgement x
 
@@ -609,6 +607,21 @@ acknowledgeOrder pricedOrder = do
             }
     NotSent =>
       pure Nothing
+
+-- Place order step
+
+export
+placePricedOrder : PricedOrder -> POM ()
+placePricedOrder = PlacePricedOrder
+
+export
+createEvents : PricedOrder -> Maybe OrderAcknowledgementSent -> List PlacedOrderEvent
+createEvents pricedOrder orderAcknowledgementSent =
+  catMaybes
+    [ Just $ OrderPlacedEvent pricedOrder
+    , map AcknowledgementSentEvent orderAcknowledgementSent
+    , map BillableOrderPlacedEvent $ createBillingEvent pricedOrder
+    ]
 
 -- Page 142
 -- Page 167

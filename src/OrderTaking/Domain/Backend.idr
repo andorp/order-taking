@@ -5,11 +5,13 @@ import Control.Monad.Reader
 import Data.String
 import System.Random
 
-import OrderTaking.Domain.PlaceOrder
 import OrderTaking.Database.Product
+import OrderTaking.Domain.PlaceOrder
+import OrderTaking.DTO.PlaceOrder
 
 import Service.NodeJS.SQLite
 import Service.NodeJS.MD5
+import Service.NodeJS.Date
 
 record Dependencies where
   constructor MkDependencies
@@ -34,54 +36,90 @@ mkRunBackend = do
     SQLite.Database.close orderDB
     pure x
 
-newOrderId : Backend OrderId
-newOrderId = do
-  -- TODO: Add timestamp
-  d   <- map (the Double) randomIO
-  md5 <- asks md5Provider
-  oid <- MD5.create md5 (show d)
-  pure $ MkOrderId oid
+namespace DTO
 
-newOrderLineId : Backend OrderLineId
-newOrderLineId = do
-  -- TODO: Add timestamp
-  d    <- map (the Double) randomIO
-  md5  <- asks md5Provider
-  olid <- MD5.create md5 (show d)
-  pure $ MkOrderLineId olid
+  fromPrice             : Price           -> Double
+  orderIdentifier       : OrderId         -> Identifier
+  toCustomerDTO         : CustomerInfo    -> CustomerDTO
+  toAddressSTO          : Address         -> AddressDTO
+  fromBillingAddress    : BillingAddress  -> AddressDTO
+  fromShippingAddress   : ShippingAddress -> AddressDTO
+  toPricedOrderDTO      : PricedOrder     -> PricedOrderDTO
+  toPricedOrderLineDTO  : PricedOrderLine -> PricedOrderLineDTO
 
-checkProductCodeExists : ProductCode -> Backend Bool
-checkProductCodeExists (WidgetProduct (MkWidgetCode x)) = Database.Product.productCodeExists x
-checkProductCodeExists (GizmoProduct (MkGizmoCode x))   = Database.Product.productCodeExists x
+  orderIdentifier (MkOrderId x) = x
 
-checkAddressExists : AddressForm -> Backend (Either CheckedAddressValidationError CheckedAddress)
-checkAddressExists addressForm = ?cae
+  toPricedOrderDTO
+    (MkPricedOrder
+      orderId
+      customerInfo
+      shippingAddress
+      billingAddress
+      orderLine
+      amountToBill)
+    = MkPricedOrderDTO
+      { identifier      = orderIdentifier orderId
+      , customer        = toCustomerDTO customerInfo
+      , shippingAddress = fromShippingAddress shippingAddress
+      , billingAddress  = fromBillingAddress billingAddress
+      , orderLines      = map toPricedOrderLineDTO orderLine
+      , amount          = fromPrice amountToBill
+      }
 
-getProductPrice : ProductCode -> Backend Price
-getProductPrice (WidgetProduct (MkWidgetCode x)) = do
-  mp <- Database.Product.productPrice x
-  -- TODO: Use Control.App
-  pure ?wat2
-getProductPrice (GizmoProduct (MkGizmoCode x)) = do
-  mp <- Database.Product.productPrice x
-  pure ?gpp_4
+namespace Model
 
-createOrderAcknowledgementLetter : PricedOrder -> Backend HtmlString
-createOrderAcknowledgementLetter pricedOrder = ?coal
+  newOrderId : Backend OrderId
+  newOrderId = do
+    n   <- Date.now
+    d   <- map (the Double) randomIO
+    md5 <- asks md5Provider
+    oid <- MD5.create md5 (show n ++ show d)
+    pure $ MkOrderId oid
 
-sendOrderAcknowledgement : OrderAcknowledgement -> Backend AckSent
-sendOrderAcknowledgement orderAcknowledgement = ?soa
+  newOrderLineId : Backend OrderLineId
+  newOrderLineId = do
+    n    <- Date.now
+    d    <- map (the Double) randomIO
+    md5  <- asks md5Provider
+    olid <- MD5.create md5 (show n ++ show d)
+    pure $ MkOrderLineId olid
 
-export
-backend : Model Backend
-backend = MkModel
-  { throwError                       = throwError
-  , catchError                       = tryError
-  , newOrderId                       = newOrderId
-  , newOrderLineId                   = newOrderLineId
-  , checkProductCodeExists           = checkProductCodeExists
-  , checkAddressExists               = checkAddressExists
-  , getProductPrice                  = getProductPrice
-  , createOrderAcknowledgementLetter = createOrderAcknowledgementLetter
-  , sendOrderAcknowledgement         = sendOrderAcknowledgement
-  }
+  checkProductCodeExists : ProductCode -> Backend Bool
+  checkProductCodeExists (WidgetProduct (MkWidgetCode x)) = Database.Product.productCodeExists x
+  checkProductCodeExists (GizmoProduct (MkGizmoCode x))   = Database.Product.productCodeExists x
+
+  checkAddressExists : AddressForm -> Backend (Either CheckedAddressValidationError CheckedAddress)
+  checkAddressExists addressForm = ?cae
+
+  getProductPrice : ProductCode -> Backend Price
+  getProductPrice (WidgetProduct (MkWidgetCode x)) = do
+    mp <- Database.Product.productPrice x
+    -- TODO: Use Control.App
+    pure ?wat2
+  getProductPrice (GizmoProduct (MkGizmoCode x)) = do
+    mp <- Database.Product.productPrice x
+    pure ?gpp_4
+
+  placePricedOrder : PricedOrder -> Backend ()
+  placePricedOrder po = ?wat1
+
+  createOrderAcknowledgementLetter : PricedOrder -> Backend HtmlString
+  createOrderAcknowledgementLetter pricedOrder = ?coal
+
+  sendOrderAcknowledgement : OrderAcknowledgement -> Backend AckSent
+  sendOrderAcknowledgement orderAcknowledgement = ?soa
+
+  export
+  backend : Model Backend
+  backend = MkModel
+    { throwError                       = throwError
+    , catchError                       = tryError
+    , newOrderId                       = newOrderId
+    , newOrderLineId                   = newOrderLineId
+    , checkProductCodeExists           = checkProductCodeExists
+    , checkAddressExists               = checkAddressExists
+    , getProductPrice                  = getProductPrice
+    , placePricedOrder                 = placePricedOrder
+    , createOrderAcknowledgementLetter = createOrderAcknowledgementLetter
+    , sendOrderAcknowledgement         = sendOrderAcknowledgement
+    }

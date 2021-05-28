@@ -5,6 +5,7 @@ import OrderTaking.BoundedContext.PlaceOrder
 import Service.NodeJS.HTTP
 import Service.NodeJS.SQLite
 import Service.NodeJS.MD5
+import Service.NodeJS.Date
 import OrderTaking.Database.Order
 import OrderTaking.Database.Product
 import OrderTaking.Domain.Backend
@@ -24,8 +25,8 @@ main1 = do
   server <- HTTP.createServer http helloWorld
   Server.listen server 3000 "127.0.0.1"
 
-printError : Error -> IO ()
-printError err = case !(occured err) of
+printError : String -> Error -> IO ()
+printError _ err = case !(occured err) of
   Nothing => pure ()
   Just e  => putStrLn !(toString e)
 
@@ -68,5 +69,12 @@ main4 = do
   Database.Order.initDB
   Database.Product.initDB
 
+main5 : IO ()
+main5 = do
+  n1 <- Date.now
+  printLn n1
+  n2 <- Date.now
+  printLn n2
+
 main : IO ()
-main = main4
+main = main1

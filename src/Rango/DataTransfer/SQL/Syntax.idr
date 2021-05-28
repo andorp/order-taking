@@ -15,14 +15,14 @@ FieldName = String
 public export
 data SQLType
   = SQL_Integer
-  | SQL_Number
   | SQL_Text
+  | SQL_Double
+  | SQL_Datetime
 
 public export
 data Value : (sqlType : SQLType) -> Type where
   SQLIntVal     : Int     -> Value SQL_Integer
-  SQLDoubleVal  : Double  -> Value SQL_Number
-  SQLIntegerVal : Integer -> Value SQL_Number
+  SQLDoubleVal  : Double  -> Value SQL_Double
   SQLTextVal    : String  -> Value SQL_Text
 
 public export
@@ -77,9 +77,10 @@ data Command : Type where
     -> Command
 
 renderSQLType : SQLType -> String
-renderSQLType SQL_Integer = "INTEGER"
-renderSQLType SQL_Number  = "NUMBER"
-renderSQLType SQL_Text    = "TEXT"
+renderSQLType SQL_Integer   = "INTEGER"
+renderSQLType SQL_Double    = "DOUBLE PRECISION"
+renderSQLType SQL_Text      = "TEXT"
+renderSQLType SQL_Datetime  = "DATETIME"
 
 renderModifier : Modifier -> String
 renderModifier PrimaryKey    = "PRIMARY KEY"
@@ -97,7 +98,7 @@ renderConstraint (ForeignKey field foreignTable foreignField) =
 
 renderCreateField : Field -> String
 renderCreateField (MkField name sqlType modifiers) =
-  name ++ " " ++ renderSQLType sqlType ++ " " ++ unwords (map renderModifier modifiers)
+  show name ++ " " ++ renderSQLType sqlType ++ " " ++ unwords (map renderModifier modifiers)
 
 export
 renderCommand : Command -> String

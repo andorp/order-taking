@@ -16,3 +16,4 @@ ffi_create : MD5 -> String -> PrimIO String
 export
 create : HasIO io => MD5 -> String -> io String
 create m s = primIO (ffi_create m s)
+

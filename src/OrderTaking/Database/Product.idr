@@ -23,8 +23,8 @@ export
 productPrice : HasIO io => String -> io (Maybe Double)
 -- TODO
 
-logError : Error -> IO ()
-logError err = case !(occured err) of
+logError : String -> Error -> IO ()
+logError _ err = case !(occured err) of
   Nothing => pure ()
   Just e  => putStrLn !(toString e)
 

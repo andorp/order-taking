@@ -48,6 +48,7 @@ poRunCmd AddInvalidOrder   st = pure [InvalidOrderRegistered st]
 poRunCmd PriceOrder        st = priceOrder st
 poRunCmd SendAckToCustomer st = do
   ack <- acknowledgeOrder st
+  placePricedOrder st
   pure $ createEvents st ack
 poRunCmd SendInvalidOrder  st = pure st
 
