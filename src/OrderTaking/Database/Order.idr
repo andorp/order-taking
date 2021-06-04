@@ -90,42 +90,42 @@ renderMaybe Nothing  = "NULL"
 renderMaybe (Just x) = show x
 
 export
-saveAddress : Database -> AddressDTO -> IO ()
+saveAddress : HasIO io => Database -> AddressDTO -> io ()
 saveAddress db (MkAddressDTO identifier addressLine1 addressLine2 addressLine3 addressLine4 city zipCode) = do
-  Database.run db
+  liftIO $ Database.run db
     ( "INSERT INTO address (id, line1, line2, line3, line4, city, zip)" ++
       "VALUES (\{show identifier},\{show addressLine1},\{renderMaybe addressLine2},\{renderMaybe addressLine3},\{renderMaybe addressLine4},\{show city},\{show zipCode})")
     logError
 
 export
-saveCustomer : Database -> CustomerDTO -> IO ()
+saveCustomer : HasIO io => Database -> CustomerDTO -> io ()
 saveCustomer db (MkCustomerDTO identifier firstName lastName emailAddress) = do
-  Database.run db
+  liftIO $ Database.run db
     ( "INSERT INTO customer (id, first_name, last_name, email)" ++
       "VALUES (\{show identifier},\{show firstName},\{show lastName}, \{show emailAddress})")
     logError
 
 export
-savePricedOrderLine : Database -> PricedOrderLineDTO -> IO ()
+savePricedOrderLine : HasIO io => Database -> PricedOrderLineDTO -> io ()
 savePricedOrderLine db (MkPricedOrderLineDTO identifier productCode quantity price) = do
-  Database.run db
+  liftIO $ Database.run db
     ( "INSERT INTO priced_order_line (id,product_code,quantity,price)" ++
       "VALUES (\{show identifier},\{show productCode},\{show quantity},\{show price})" )
     logError
 
 export
-saveOrder : Database -> PricedOrderDTO -> IO ()
+saveOrder : HasIO io => Database -> PricedOrderDTO -> io ()
 saveOrder db (MkPricedOrderDTO identifier customer shippingAddress billingAddress orderLines amount) = do
   saveCustomer db customer
   saveAddress db shippingAddress
   saveAddress db billingAddress
   traverse_ (savePricedOrderLine db) orderLines
-  Database.run db
+  liftIO $ Database.run db
     ( "INSERT INTO priced_order (id,customer,shipping_address,billing_address,amount_to_bill)" ++
       "VALUES (\{show identifier},\{show customer.identifier},\{show shippingAddress.identifier},\{show billingAddress.identifier},\{show amount})" )
     logError
   for_ orderLines $ \(MkPricedOrderLineDTO orderIdentifier productCode quantity price) => do
-    Database.run db
+    liftIO $ Database.run db
       ( "INSERT INTO priced_order_lines (ordr, order_line)" ++
         "VALUES (\{show identifier},\{show orderIdentifier})")
       logError
@@ -140,44 +140,4 @@ initDB = do
   Database.run db pricedOrderLineTable  logError
   Database.run db orderLinesTable       logError
   Database.run db pricedOrderTable      logError
-  saveOrder db
-    $ MkPricedOrderDTO
-      { identifier = "ID1"
-      , customer =
-        MkCustomerDTO
-        { identifier = "ID2"
-        , firstName = "Jack"
-        , lastName = "Doe"
-        , emailAddress = "jack.doe@gmail.com"
-        }
-      , shippingAddress =
-        MkAddressDTO
-        { identifier = "ID3"
-        , addressLine1 = "SOME ADDRESS"
-        , addressLine2 = Nothing
-        , addressLine3 = Nothing
-        , addressLine4 = Nothing
-        , city = "GREAT"
-        , zipCode = "ZP-31683"
-        }
-      , billingAddress =
-        MkAddressDTO
-        { identifier = "ID3"
-        , addressLine1 = "SOME ADDRESS"
-        , addressLine2 = Nothing
-        , addressLine3 = Nothing
-        , addressLine4 = Nothing
-        , city = "GREAT"
-        , zipCode = "ZP-31683"
-        }
-      , orderLines =
-        [ MkPricedOrderLineDTO
-          { identifier = "ID4"
-          , productCode = "W1204"
-          , quantity = 1.1
-          , price = 100.1
-          }
-        ]
-      , amount = 100.1
-      }
   Database.close db

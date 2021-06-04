@@ -75,14 +75,14 @@ record PricedOrderDTO where
 -- %runElab deriveSQL `{{CustomerDTO}}
 -- %runElab deriveSQL `{{OrderDTO}}
 
--- TODO: HKD framework for SQL like data transfer
-public export
-record AddressHKDTO (field : Type -> Type) where
-  constructor MkAddressHKDTO
-  identifier   : field Identifier
-  addressLine1 : field String
-  addressLine2 : field (Maybe String)
-  addressLine3 : field (Maybe String)
-  addressLine4 : field (Maybe String)
-  city         : field String
-  zipCode      : field String
+-- -- TODO: HKD framework for SQL like data transfer
+-- public export
+-- record AddressHKDTO (field : Type -> Type) where
+--   constructor MkAddressHKDTO
+--   identifier   : field Identifier
+--   addressLine1 : field String
+--   addressLine2 : field (Maybe String)
+--   addressLine3 : field (Maybe String)
+--   addressLine4 : field (Maybe String)
+--   city         : field String
+--   zipCode      : field String

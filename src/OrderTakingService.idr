@@ -10,20 +10,10 @@ import OrderTaking.Database.Order
 import OrderTaking.Database.Product
 import OrderTaking.Domain.Backend
 import Language.JSON
+import Rango.BoundedContext.Workflow
+import Data.String
+import System
 
-
-helloWorld : Request -> Response -> IO ()
-helloWorld req rsp = do
-  Response.statusCode rsp 200
-  Response.setHeader  rsp "Content-Type" "text/plain"
-  Response.end        rsp "Your order has taken! 9"
-
-main1 : IO ()
-main1 = do
-  putStrLn "Staring Order taking service."
-  http   <- HTTP.require
-  server <- HTTP.createServer http helloWorld
-  Server.listen server 3000 "127.0.0.1"
 
 printError : String -> Error -> IO ()
 printError _ err = case !(occured err) of
@@ -45,36 +35,58 @@ onCompleted err = do
     | Just e => putStrLn !(toString e)
   putStrLn "Found entries."
 
-main2 : IO ()
-main2 = do
-  putStrLn "Starting SQLite test."
-  sqlite <- SQLite.require
-  db     <- SQLite.database sqlite "ordertaking.db"
-  let createUserTable = "CREATE TABLE user (id INTEGER PRIMARY KEY AUTOINCREMENT,name text,email text UNIQUE,password text,CONSTRAINT email_unique UNIQUE (email))"
-  Database.run db createUserTable printError
-  let insertUser = "INSERT INTO user (name, email, password) VALUES (\"admin\",\"admin@ex.com\",\"passwd\")"
-  Database.run db insertUser printError
-  let selectUser = "SELECT * FROM user;"
-  Database.each db selectUser onRow onCompleted
-  Database.close db
+orderTaking : (RunBackend (List PlacedOrderEvent)) -> Request -> Response -> IO ()
+orderTaking runBackend req rsp = do
+  let addressForm = MkAddressForm
+        { addressLine1 = "Bright Street 55."
+        , addressLine2 = Nothing
+        , addressLine3 = Nothing
+        , addressLine4 = Nothing
+        , city         = "Los Angeles"
+        , zipCode      = "ZP-55-555"
+        }
+  let cusomterInfoForm = MkCustomerInfoForm 
+        { firstName = "John"
+        , lastName = "Doe"
+        , emailAddress = "john.doe@emial.com"
+        }
+  let orderLines = [ MkOrderLineForm
+        { productCode = "G125"
+        , quantity    = "3"
+        } ]
+  let orderForm = MkOrderForm
+        { customerInfo = cusomterInfoForm
+        , shippingAddress = addressForm
+        , billingAddress  = addressForm
+        , orderLines      = orderLines
+        }
+  orderEvents <- runBackend $ orderTakingWorkflow orderForm
+  Response.statusCode rsp 200
+  Response.setHeader  rsp "Content-Type" "text/plain"
+  case orderEvents of
+    Left err     => Response.end rsp $ "There was an error: " ++ show err
+    Right events => Response.end rsp $ unlines $ "Your order has taken!" :: map show events
+  where
+    orderTakingWorkflow : OrderForm -> Backend (List PlacedOrderEvent)
+    orderTakingWorkflow = interpret backend . morph withPOMMapping PlaceOrder.workflow
 
-main3 : IO ()
-main3 = do
-  putStrLn "Start MD5 test."
-  md5 <- MD5.require
-  putStrLn $ !(MD5.create md5 "message")
-
-main4 : IO ()
-main4 = do
+initDB : IO ()
+initDB = do
   Database.Order.initDB
   Database.Product.initDB
 
-main5 : IO ()
-main5 = do
-  n1 <- Date.now
-  printLn n1
-  n2 <- Date.now
-  printLn n2
+startService : IO ()
+startService = do
+  putStrLn "Staring Order taking service."
+  run <- mkRunBackend
+  http   <- HTTP.require
+  server <- HTTP.createServer http (orderTaking run)
+  Server.listen server 3000 "127.0.0.1"
 
 main : IO ()
-main = main1
+main = do
+  args <- getArgs
+  printLn args
+  if "--init-db" `elem` args
+    then OrderTakingService.initDB
+    else startService

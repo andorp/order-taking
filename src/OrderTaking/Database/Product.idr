@@ -17,10 +17,12 @@ productTable =
 
 export
 productCodeExists : HasIO io => String -> io Bool
+productCodeExists _ = pure True
 -- TODO
 
 export
 productPrice : HasIO io => String -> io (Maybe Double)
+productPrice _ = pure $ Just 1.0
 -- TODO
 
 logError : String -> Error -> IO ()

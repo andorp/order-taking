@@ -12,6 +12,10 @@ data Price = MkPrice Double
 namespace Price
 
   export
+  create : Double -> Either String Price
+  create p = if p < 0.0 then Left "Zero or negative price." else Right (MkPrice p)
+
+  export
   multiply : Price -> Double -> Price
   multiply (MkPrice x) d = MkPrice (x * d)
 
@@ -23,11 +27,20 @@ namespace Price
   sumPrices : List Price -> Price
   sumPrices = MkPrice . sum . map value
 
-data EmailAddress = MkEmailAddress String
+namespace EmailAddress
 
-mkEmailAddress : String -> Maybe EmailAddress
-mkEmailAddress = Just . MkEmailAddress -- TODO
+  export
+  data EmailAddress = MkEmailAddress String
 
+  export
+  create : String -> Maybe EmailAddress
+  create = Just . MkEmailAddress -- TODO
+
+  export
+  value : EmailAddress -> String
+  value (MkEmailAddress e) = e
+
+public export
 record PersonalName where
   constructor MkPersonalName
   firstName : StringN 50
@@ -39,10 +52,18 @@ record CustomerInfo where
   personalName : PersonalName
   emailAddress : EmailAddress
 
-data ZipCode = MkZipCode String
+namespace ZipCode
 
-mkZipCode : String -> Maybe ZipCode
-mkZipCode = Just . MkZipCode -- TODO
+  export
+  data ZipCode = MkZipCode String
+
+  export
+  create : String -> Maybe ZipCode
+  create = Just . MkZipCode -- TODO
+
+  export
+  value : ZipCode -> String
+  value (MkZipCode z) = z
 
 public export
 record AddressForm where
@@ -90,25 +111,31 @@ data ProductCode
 mkProductCode : String -> Maybe ProductCode
 mkProductCode str = map WidgetProduct $ mkWidgetCode str
 
+export
+productCodeStr : ProductCode -> String
+productCodeStr (WidgetProduct (MkWidgetCode x)) = x
+productCodeStr (GizmoProduct (MkGizmoCode x)) = x
+
+public export
 record OrderLineForm where
   constructor MkOrderLineForm
   productCode : String
   quantity    : String
 
+public export
 record CustomerInfoForm where
   constructor MkCustomerInfoForm
   firstName    : String
   lastName     : String
   emailAddress : String
 
-export
+public export
 record OrderForm where
   constructor MkOrderForm
   customerInfo    : CustomerInfoForm
   shippingAddress : AddressForm
-  billingAddress  : String
+  billingAddress  : AddressForm
   orderLines      : List OrderLineForm
-  amount          : Double
 
 data UnitQuantity : Type where
   MkUnitQuantity
@@ -138,6 +165,7 @@ data OrderId = MkOrderId String
 public export
 data OrderLineId = MkOrderLineId String
 
+public export
 record OrderLine where
   constructor MkOrderLine
   orderLineId : OrderLineId
@@ -248,6 +276,7 @@ record OrderAcknowledgementSent where
   orderId      : OrderId
   emailAddress : EmailAddress
 
+public export
 data ProductCodeErr = MkProductCodeErr String
 
 export
@@ -264,6 +293,13 @@ data PlacedOrderEvent
   | AcknowledgementSentEvent OrderAcknowledgementSent
   | InvalidOrderRegistered   InvalidOrder
 
+export
+Show PlacedOrderEvent where
+  show (OrderPlacedEvent x) = "PlacedOrderEvent"
+  show (BillableOrderPlacedEvent x) = "BillableOrderPlacedEvent"
+  show (AcknowledgementSentEvent x) = "AcknowledgementSentEvent"
+  show (InvalidOrderRegistered x) = "InvalidOrderRegistered"
+
 createBillingEvent : PricedOrder -> Maybe BillableOrderPlaced
 createBillingEvent pricedOrder = do
   if value pricedOrder.amountToBill > 0
@@ -274,7 +310,8 @@ createBillingEvent pricedOrder = do
                   }
      else Nothing
 
-data PricingError = MkPricingError
+public export
+data PricingError = MkPricingError String
 
 public export
 data AckSent = Sent | NotSent
@@ -300,6 +337,14 @@ data PlaceOrderError
   | ProductCodeError ProductCodeErr
   | PriceOrderError PricingError
   | RemoteServiceErr RemoteServiceError
+
+export
+Show PlaceOrderError where
+  show MkPlaceOrderError      = "MkPlaceOrderError"
+  show (ValidationErrors xs)  = "ValidationErrors"
+  show (ProductCodeError x)   = "ProductCodeError"
+  show (PriceOrderError x)    = "PriceOrderError"
+  show (RemoteServiceErr x)   = "RemoteServiceErr"
 
 maybeValidationErrors : PlaceOrderError -> Maybe (List ValidationError)
 maybeValidationErrors (ValidationErrors es) = Just es
@@ -389,6 +434,7 @@ record Model (m : Type -> Type) where
 
 ||| The function that gives interpretation of a POM expression in the monad 'm' using the
 ||| given model.
+export
 interpret : Monad m => Model m -> POM a -> m a
 interpret model (Pure x)                             = pure x
 interpret model (Bind m k)                           = interpret model m >>= (interpret model . k)
@@ -455,13 +501,13 @@ checkCustomerInfoForm customer =
   MkCustomerInfo
     <$> (MkPersonalName
           <$> field customer.firstName
-                    (mkStringN 50)
+                    (StringN.create 50)
                     (NameValidation (MkNameValidationError "First name" customer.firstName))
           <*> field customer.lastName
-                    (mkStringN 50)
+                    (StringN.create 50)
                     (NameValidation (MkNameValidationError "Last name" customer.lastName)))
     <*> field customer.emailAddress
-              mkEmailAddress
+              EmailAddress.create
               (EmailValidation (MkEmailValidationError customer.emailAddress))
 
 createCustomerInfo : CustomerInfoForm -> POM CustomerInfo
@@ -473,12 +519,12 @@ createCustomerInfo customer = do
 checkAddressForm : AddressForm -> Form AddressValidationError Address
 checkAddressForm addr =
   MkAddress
-    <$> field addr.addressLine1 (mkStringN 50) (MkAddressLineError addr.addressLine1)
-    <*> optionalField addr.addressLine2 (mkStringN 50) (MkAddressOptLineError addr.addressLine2)
-    <*> optionalField addr.addressLine3 (mkStringN 50) (MkAddressOptLineError addr.addressLine3)
-    <*> optionalField addr.addressLine4 (mkStringN 50) (MkAddressOptLineError addr.addressLine4)
-    <*> field addr.city (mkStringN 50) (MkAddressCityError addr.city)
-    <*> field addr.zipCode mkZipCode   (MkAddressZipCodeError addr.zipCode)
+    <$> field addr.addressLine1 (StringN.create 50) (MkAddressLineError addr.addressLine1)
+    <*> optionalField addr.addressLine2 (StringN.create 50) (MkAddressOptLineError addr.addressLine2)
+    <*> optionalField addr.addressLine3 (StringN.create 50) (MkAddressOptLineError addr.addressLine3)
+    <*> optionalField addr.addressLine4 (StringN.create 50) (MkAddressOptLineError addr.addressLine4)
+    <*> field addr.city (StringN.create 50) (MkAddressCityError addr.city)
+    <*> field addr.zipCode ZipCode.create   (MkAddressZipCodeError addr.zipCode)
 
 toAddress : AddressForm -> POM Address
 toAddress addressForm = do

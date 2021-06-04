@@ -42,6 +42,7 @@ record Morphism
       -> chk s b1 b2
       -> (StateType s) -> m (Either (StateType b1) (StateType b2))
 
+export
 morph
   :  Functor m
   => Applicative m

@@ -83,6 +83,10 @@ namespace Database
   run db sql onErr = do
     primIO (ffi_run db sql (\e => toPrim $ onErr sql e))
 
+  export
+  ignoreError : Sql -> Error -> IO ()
+  ignoreError _ _ = pure ()
+
   %foreign "node:lambda: (db,s,p) => (db.run(s,[p]))"
   ffi_runWith1 : Database -> String -> String -> PrimIO ()
 
