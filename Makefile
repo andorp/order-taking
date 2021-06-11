@@ -36,7 +36,7 @@ start: init clean nodejs
 	cp build/exec/order-taking-service service/order-taking-service.js
 	$(node) service/order-taking-service.js
 
-start-opt: init clean nodejs
+start-opt: init nodejs
 	rm service/order-taking-service.js
 	cp build/exec/order-taking-service service/order-taking-service.js
 	npx google-closure-compiler service/order-taking-service.js \

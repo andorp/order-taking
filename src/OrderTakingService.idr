@@ -2,10 +2,6 @@ module OrderTakingService
 
 import OrderTaking.Domain.PlaceOrder
 import OrderTaking.BoundedContext.PlaceOrder
-import Service.NodeJS.HTTP
-import Service.NodeJS.SQLite
-import Service.NodeJS.MD5
-import Service.NodeJS.Date
 import OrderTaking.Database.Order
 import OrderTaking.Database.Product
 import OrderTaking.Domain.Backend
@@ -14,29 +10,15 @@ import Rango.BoundedContext.Workflow
 import Data.String
 import System
 
+import Service.NodeJS.HTTP
+import Service.NodeJS.SQLite
+import Service.NodeJS.MD5
+import Service.NodeJS.Date
+import Service.NodeJS.Promise
 
-printError : String -> Error -> IO ()
-printError _ err = case !(occured err) of
-  Nothing => pure ()
-  Just e  => putStrLn !(toString e)
 
-onRow : Error -> Row -> IO ()
-onRow err row = do
-  Nothing <- occured err
-    | Just e => putStrLn !(toString e)
-  Just r <- nonEmpty row
-    | _ => putStrLn "Empty row."
-  putStrLn !(toString r)
-  putStrLn (show !(json r))
-
-onCompleted : Error -> IO ()
-onCompleted err = do
-  Nothing <- occured err
-    | Just e => putStrLn !(toString e)
-  putStrLn "Found entries."
-
-orderTaking : (RunBackend (List PlacedOrderEvent)) -> Request -> Response -> IO ()
-orderTaking runBackend req rsp = do
+orderTaking : RunBackend -> Request -> Response -> IO ()
+orderTaking rb req rsp = do
   let addressForm = MkAddressForm
         { addressLine1 = "Bright Street 55."
         , addressLine2 = Nothing
@@ -60,15 +42,21 @@ orderTaking runBackend req rsp = do
         , billingAddress  = addressForm
         , orderLines      = orderLines
         }
-  orderEvents <- runBackend $ orderTakingWorkflow orderForm
-  Response.statusCode rsp 200
-  Response.setHeader  rsp "Content-Type" "text/plain"
-  case orderEvents of
-    Left err     => Response.end rsp $ "There was an error: " ++ show err
-    Right events => Response.end rsp $ unlines $ "Your order has taken!" :: map show events
+  resolve (do
+    orderEvents <- runBackend rb $ orderTakingWorkflow orderForm
+    Response.statusCode rsp 200
+    Response.setHeader  rsp "Content-Type" "text/plain"
+    case orderEvents of
+      Left err     => Response.end rsp $ "There was an error: " ++ show err
+      Right events => Response.end rsp $ unlines $ "Your order has taken!" :: map show events
+    pure ())
+    (\_ => pure ())
+    (\err => do
+      Response.end rsp $ "There was an error: " ++ show err
+      putStrLn err)
   where
     orderTakingWorkflow : OrderForm -> Backend (List PlacedOrderEvent)
-    orderTakingWorkflow = interpret backend . morph withPOMMapping PlaceOrder.workflow
+    orderTakingWorkflow orderForm = interpret backend $ morph withPOMMapping PlaceOrder.workflow $ orderForm
 
 initDB : IO ()
 initDB = do

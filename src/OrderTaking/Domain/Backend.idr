@@ -1,5 +1,6 @@
 module OrderTaking.Domain.Backend
 
+import Control.Monad.Trans
 import public Control.Monad.Either
 import public Control.Monad.Reader
 
@@ -15,72 +16,8 @@ import OrderTaking.DTO.PlaceOrder
 import Service.NodeJS.SQLite
 import Service.NodeJS.MD5
 import Service.NodeJS.Date
+import Service.NodeJS.Promise
 
-record Dependencies where
-  constructor MkDependencies
-  md5Provider : MD5
-  orderDB     : Database
-  productDB   : Database
-
-public export
-record Backend a where
-  constructor MkBackend
-  backend : EitherT PlaceOrderError (ReaderT Dependencies IO) a
-
-export
-Functor Backend where
-  map f (MkBackend x) = MkBackend (map f x)
-
-export
-Applicative Backend where
-  pure x = MkBackend (pure x)
-  (MkBackend f) <*> (MkBackend x) = MkBackend (f <*> x)
-
-export
-Monad Backend where
-  join (MkBackend m) = MkBackend (join (map backend m))
-
-export
-HasIO Backend where
-  liftIO io = MkBackend (liftIO io)
-
-export
-MonadReader Dependencies Backend where
-  ask = MkBackend ask
-  local f (MkBackend m) = MkBackend (local f m)
-
-export
-MonadError PlaceOrderError Backend where
-  catchError (MkBackend m) f = MkBackend (catchError m (backend . f))
-  throwError e = MkBackend (throwError e)
-
-public export
-RunBackend : Type -> Type
-RunBackend a = Backend a -> IO (Either PlaceOrderError a)
-
-export
-mkRunBackend : IO (RunBackend a)
-mkRunBackend = do
-  sqlite <- SQLite.require
-  md5 <- MD5.require
-  pure $ \script => do
-    -- TODO: Bracketing on exception.
-    orderDB   <- SQLite.database sqlite "./db/order.db"
-    productDB <- SQLite.database sqlite "./db/product.db"
-    SQLite.Database.run orderDB   "begin" ignoreError
-    SQLite.Database.run productDB "begin" ignoreError
-    let conn = MkDependencies md5 orderDB productDB
-    x <- runReaderT conn (runEitherT (backend script))
-    case x of
-      Left _ => do
-        SQLite.Database.run orderDB   "rollback" ignoreError
-        SQLite.Database.run productDB "rollback" ignoreError
-      Right _ => do
-        SQLite.Database.run orderDB   "commit" ignoreError
-        SQLite.Database.run productDB "commit" ignoreError
-    SQLite.Database.close productDB
-    SQLite.Database.close orderDB
-    pure x
 
 namespace DTO
 
@@ -140,7 +77,86 @@ namespace DTO
       , price       = fromPrice po.linePrice
       }
 
-namespace Model
+
+record Dependencies where
+  constructor MkDependencies
+  md5Provider : MD5
+  orderDB     : Database
+  productDB   : Database
+
+public export
+data Backend : Type -> Type where
+  MkBackend : EitherT PlaceOrderError (ReaderT Dependencies Promise) a -> Backend a
+
+backend : Backend a -> EitherT PlaceOrderError (ReaderT Dependencies Promise) a
+backend (MkBackend m) = m
+
+export
+Functor Backend where
+  map f (MkBackend x) = MkBackend (map f x)
+
+export
+Applicative Backend where
+  pure x = MkBackend (pure x)
+  (MkBackend f) <*> (MkBackend x) = MkBackend (f <*> x)
+
+export
+Monad Backend where
+  (MkBackend m) >>= k = MkBackend (m >>= (backend . k))
+
+export
+HasIO Backend where
+  liftIO io = MkBackend (liftIO io)
+
+export
+MonadReader Dependencies Backend where
+  ask = MkBackend ask
+  local f (MkBackend m) = MkBackend (local f m)
+
+export
+MonadError PlaceOrderError Backend where
+  catchError (MkBackend m) f = MkBackend (catchError m (backend . f))
+  throwError e = MkBackend (throwError e)
+
+export
+liftPromise : Promise a -> Backend a
+liftPromise p = MkBackend (lift (lift p))
+
+export
+data RunBackend : Type where
+  MkRunBackend : ((a : Type) -> Backend a -> Promise (Either PlaceOrderError a)) -> RunBackend
+
+export
+runBackend : {a : Type} -> RunBackend -> Backend a -> Promise (Either PlaceOrderError a)
+runBackend {a} (MkRunBackend r) = r a
+
+export
+mkRunBackend : IO RunBackend
+mkRunBackend = do
+  sqlite <- SQLite.require
+  md5    <- MD5.require
+  pure $ MkRunBackend $ \type, script => do
+    -- TODO: Bracketing on exception.
+    orderDB   <- SQLite.database sqlite "./db/order.db"
+    productDB <- SQLite.database sqlite "./db/product.db"
+    Nothing <- SQLite.Database.runP orderDB   "begin"
+      | Just err => reject !(toString err)
+    Nothing <- SQLite.Database.runP productDB "begin"
+      | Just err => reject !(toString err)
+    let conn = MkDependencies md5 orderDB productDB
+    x <- runReaderT conn (runEitherT (backend script))
+    case x of
+      Left _ => do
+        ignore $ SQLite.Database.runP orderDB   "rollback"
+        ignore $ SQLite.Database.runP productDB "rollback"
+      Right _ => do
+        ignore $ SQLite.Database.runP orderDB   "commit"
+        ignore $ SQLite.Database.runP productDB "commit"
+    SQLite.Database.close productDB
+    SQLite.Database.close orderDB
+    pure (the (Either PlaceOrderError type) x)
+
+namespace Model2
 
   newOrderId : Backend OrderId
   newOrderId = do
@@ -186,8 +202,9 @@ namespace Model
   placePricedOrder : PricedOrder -> Backend ()
   placePricedOrder pricedOrder = do
     db <- asks orderDB
-    -- TODO: Error reporting
-    Order.saveOrder db (toPricedOrderDTO pricedOrder)
+    Right x <- liftPromise $ runOrderDB $ Order.saveOrder db (toPricedOrderDTO pricedOrder)
+      | Left err => throwError $ MkPlaceOrderError $ show err
+    pure x
 
   createOrderAcknowledgementLetter : PricedOrder -> Backend HtmlString
   createOrderAcknowledgementLetter pricedOrder = do

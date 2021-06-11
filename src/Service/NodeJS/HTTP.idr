@@ -24,21 +24,21 @@ namespace Response
   ffi_statusCode : Response -> Int -> PrimIO ()
 
   export
-  statusCode : Response -> Int -> IO ()
+  statusCode : HasIO io => Response -> Int -> io ()
   statusCode r c = primIO (ffi_statusCode r c)
 
   %foreign "node:lambda: (r,h,v) => {r.setHeader(h, v)}"
   ffi_setHeader : Response -> String -> String -> PrimIO ()
 
   export
-  setHeader : Response -> String -> String -> IO ()
+  setHeader : HasIO io => Response -> String -> String -> io ()
   setHeader r h v = primIO (ffi_setHeader r h v)
 
   %foreign "node:lambda: (r,e) => (r.end(e))"
   ffi_end : Response -> String -> PrimIO ()
 
   export
-  end : Response -> String -> IO ()
+  end : HasIO io => Response -> String -> io ()
   end r e = primIO (ffi_end r e)
 
 namespace Server

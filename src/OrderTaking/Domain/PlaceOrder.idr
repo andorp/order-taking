@@ -332,7 +332,7 @@ record RemoteServiceError where
 
 public export
 data PlaceOrderError
-  = MkPlaceOrderError
+  = MkPlaceOrderError String
   | ValidationErrors (List ValidationError)
   | ProductCodeError ProductCodeErr
   | PriceOrderError PricingError
@@ -340,7 +340,7 @@ data PlaceOrderError
 
 export
 Show PlaceOrderError where
-  show MkPlaceOrderError      = "MkPlaceOrderError"
+  show (MkPlaceOrderError e)  = "MkPlaceOrderError: " ++ e
   show (ValidationErrors xs)  = "ValidationErrors"
   show (ProductCodeError x)   = "ProductCodeError"
   show (PriceOrderError x)    = "PriceOrderError"

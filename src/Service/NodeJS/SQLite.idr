@@ -1,6 +1,8 @@
 module Service.NodeJS.SQLite
 
 import Language.JSON
+import Service.NodeJS.Promise
+
 
 ||| SQL statement
 public export
@@ -12,11 +14,16 @@ namespace Error
   export
   data Error : Type where [external]
 
+  public export
+  data SomeError
+    = NoError
+    | HasError Error
+
   %foreign "node:lambda: e => {return String(e);}"
   ffi_toString : Error -> PrimIO String
 
   export
-  toString : Error -> IO String
+  toString : HasIO io => Error -> io String
   toString e = primIO (ffi_toString e)
 
   %foreign "node:lambda: e => {if(e){return BigInt(0);}else{return BigInt(1);}}"
@@ -72,16 +79,24 @@ namespace Database
   ffi_close : Database -> PrimIO ()
 
   export
-  close : Database -> IO ()
+  close : HasIO io => Database -> io ()
   close db = primIO (ffi_close db)
 
   %foreign "node:lambda: (db,s,er) => (db.run(s, (e) => (er(e)())))"
   ffi_run : Database -> Sql -> (Error -> PrimIO ()) -> PrimIO ()
 
   export
-  run : Database -> Sql -> (Sql -> Error -> IO ()) -> IO ()
+  run : HasIO io => Database -> Sql -> (Sql -> Error -> IO ()) -> io ()
   run db sql onErr = do
     primIO (ffi_run db sql (\e => toPrim $ onErr sql e))
+
+  -- TODO: Use SomeError
+  export
+  runP : Database -> Sql -> Promise (Maybe Error)
+  runP db sql = promisify
+    (\ok, err => ffi_run db sql (\e => toPrim $ do
+      mErr <- occured e
+      ok mErr))
 
   export
   ignoreError : Sql -> Error -> IO ()
@@ -100,6 +115,23 @@ namespace Database
   export
   get : Database -> Sql -> (Error -> Row -> IO ()) -> IO ()
   get db sql callback = primIO (ffi_get db sql (\err,row => toPrim $ callback err row))
+
+  export
+  getP : Database -> Sql -> Promise Row
+  getP db sql = promisify (\ok, err => ffi_get db sql (\e, row => toPrim $ do
+    mErr <- occured e
+    case mErr of
+      Nothing => ok row
+      Just e2 => err !(toString e2)))
+
+  export
+  getP2 : Database -> Sql -> Promise (Either Error Row)
+  -- getP db sql = promisify (\ok, err => ffi_get db sql (\e, row => toPrim $ do
+  --   mErr <- occured e
+  --   case mErr of
+  --     Nothing => ok row
+  --     Just e2 => err !(toString e2)))
+
 
   %foreign "node:lambda: (db,s,row,comp) => (db.each(s, (e,r) => (row(e)(r)()), (e,c) => (comp(e)()) ))"
   ffi_each
@@ -121,13 +153,12 @@ namespace SQLite
   ffi_require : () -> PrimIO SQLite
 
   export
-  require : IO SQLite
+  require : HasIO io => io SQLite
   require = primIO (ffi_require ())
 
-  %foreign "node:lambda: (s,d) => (new s.Database(d,(e) => {if(e){console.log(e);throw e}}))"
+  %foreign "node:lambda: (s,d) => (new s.Database(d,(e) => {if(e){throw e}}))"
   ffi_database : SQLite -> String -> PrimIO Database
 
   export
-  database : SQLite -> String -> IO Database
+  database : HasIO io => SQLite -> String -> io Database
   database s db = primIO (ffi_database s db)
-

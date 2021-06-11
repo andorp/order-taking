@@ -1,9 +1,14 @@
 module OrderTaking.Database.Order
 
+import public Control.Monad.Either
+
 import Data.String
-import Service.NodeJS.SQLite
 import OrderTaking.DTO.PlaceOrder
 import Rango.DataTransfer.SQL.Syntax
+import Control.Monad.Trans
+
+import Service.NodeJS.SQLite
+import Service.NodeJS.Promise
 
 
 createAddressTable : Command
@@ -78,66 +83,83 @@ createPricedOrderTable = CreateTable
 pricedOrderTable : String
 pricedOrderTable = renderCommand createPricedOrderTable
 
-logError : String -> Error -> IO ()
-logError sql err = case !(occured err) of
-  Nothing => pure ()
-  Just e  => do
---    putStrLn sql
-    putStrLn !(toString e)
-
 renderMaybe : Show a => Maybe a -> String
 renderMaybe Nothing  = "NULL"
 renderMaybe (Just x) = show x
 
+public export
+data OrderDBError
+  = SaveAddressError String
+  | SaveCustomerError String
+  | SavePricedOrderLineError String
+  | SaveOrderError String
+
 export
-saveAddress : HasIO io => Database -> AddressDTO -> io ()
+Show OrderDBError where
+  showPrec d (SaveAddressError          x) = "SaveAddressError: " ++ x 
+  showPrec d (SaveCustomerError         x) = "SaveCustomerError: " ++ x
+  showPrec d (SavePricedOrderLineError  x) = "SavePricedOrderLineError: " ++ x
+  showPrec d (SaveOrderError            x) = "SaveOrderError: " ++ x
+
+export
+OrderDB : Type -> Type
+OrderDB a = EitherT OrderDBError Promise a
+
+export
+runOrderDB : OrderDB a -> Promise (Either OrderDBError a)
+runOrderDB = runEitherT
+
+throwIfFail : (String -> OrderDBError) -> Promise (Maybe Error) -> OrderDB ()
+throwIfFail mkError p = do
+  Nothing <- lift p
+    | Just err => throwError $ mkError !(toString err)
+  pure ()
+
+export
+saveAddress : Database -> AddressDTO -> OrderDB ()
 saveAddress db (MkAddressDTO identifier addressLine1 addressLine2 addressLine3 addressLine4 city zipCode) = do
-  liftIO $ Database.run db
+  throwIfFail SaveAddressError $ Database.runP db
     ( "INSERT INTO address (id, line1, line2, line3, line4, city, zip)" ++
       "VALUES (\{show identifier},\{show addressLine1},\{renderMaybe addressLine2},\{renderMaybe addressLine3},\{renderMaybe addressLine4},\{show city},\{show zipCode})")
-    logError
 
 export
-saveCustomer : HasIO io => Database -> CustomerDTO -> io ()
+saveCustomer : Database -> CustomerDTO -> OrderDB ()
 saveCustomer db (MkCustomerDTO identifier firstName lastName emailAddress) = do
-  liftIO $ Database.run db
+  throwIfFail SaveCustomerError $ Database.runP db
     ( "INSERT INTO customer (id, first_name, last_name, email)" ++
       "VALUES (\{show identifier},\{show firstName},\{show lastName}, \{show emailAddress})")
-    logError
 
 export
-savePricedOrderLine : HasIO io => Database -> PricedOrderLineDTO -> io ()
+savePricedOrderLine : Database -> PricedOrderLineDTO -> OrderDB ()
 savePricedOrderLine db (MkPricedOrderLineDTO identifier productCode quantity price) = do
-  liftIO $ Database.run db
+  throwIfFail SavePricedOrderLineError $ Database.runP db
     ( "INSERT INTO priced_order_line (id,product_code,quantity,price)" ++
       "VALUES (\{show identifier},\{show productCode},\{show quantity},\{show price})" )
-    logError
 
 export
-saveOrder : HasIO io => Database -> PricedOrderDTO -> io ()
+saveOrder : Database -> PricedOrderDTO -> OrderDB ()
 saveOrder db (MkPricedOrderDTO identifier customer shippingAddress billingAddress orderLines amount) = do
   saveCustomer db customer
   saveAddress db shippingAddress
   saveAddress db billingAddress
   traverse_ (savePricedOrderLine db) orderLines
-  liftIO $ Database.run db
+  throwIfFail SaveOrderError $ Database.runP db
     ( "INSERT INTO priced_order (id,customer,shipping_address,billing_address,amount_to_bill)" ++
       "VALUES (\{show identifier},\{show customer.identifier},\{show shippingAddress.identifier},\{show billingAddress.identifier},\{show amount})" )
-    logError
   for_ orderLines $ \(MkPricedOrderLineDTO orderIdentifier productCode quantity price) => do
-    liftIO $ Database.run db
+    throwIfFail SaveOrderError $ Database.runP db
       ( "INSERT INTO priced_order_lines (ordr, order_line)" ++
         "VALUES (\{show identifier},\{show orderIdentifier})")
-      logError
 
 export
 initDB : IO ()
 initDB = do
   sqlite <- SQLite.require
   db <- SQLite.database sqlite "./db/order.db"
-  Database.run db addressTable          logError
-  Database.run db customerTable         logError
-  Database.run db pricedOrderLineTable  logError
-  Database.run db orderLinesTable       logError
-  Database.run db pricedOrderTable      logError
-  Database.close db
+  resolve' (\_ => putStrLn "OK.") putStrLn $ do
+    ignore $ Database.runP db addressTable
+    ignore $ Database.runP db customerTable
+    ignore $ Database.runP db pricedOrderLineTable
+    ignore $ Database.runP db orderLinesTable
+    ignore $ Database.runP db pricedOrderTable
+    ignore $ Database.close db
