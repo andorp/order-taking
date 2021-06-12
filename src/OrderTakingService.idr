@@ -52,7 +52,7 @@ orderTaking rb req rsp = do
     pure ())
     (\_ => pure ())
     (\err => do
-      Response.end rsp $ "There was an error: " ++ show err
+      -- Response.end rsp $ "There was an error: " ++ show err
       putStrLn err)
   where
     orderTakingWorkflow : OrderForm -> Backend (List PlacedOrderEvent)

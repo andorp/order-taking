@@ -26,18 +26,24 @@ namespace Error
   toString : HasIO io => Error -> io String
   toString e = primIO (ffi_toString e)
 
-  %foreign "node:lambda: e => {if(e){return BigInt(0);}else{return BigInt(1);}}"
-  ffi_isNull : Error -> PrimIO Bool
+  %foreign "node:lambda: e => (String(e))"
+  ffi_showError : Error -> String
 
-  isNull : Error -> IO Bool
-  isNull e = primIO (ffi_isNull e)
-
-  ||| Checks if the error really occured
   export
-  occured : Error -> IO (Maybe Error)
-  occured e = do
-    n <- isNull e
-    pure $ if n then Nothing else Just e
+  Show Error where
+    show e = ffi_showError e
+
+%foreign "node:lambda: e => {if(e){return BigInt(0);}else{return BigInt(1);}}"
+ffi_isNull : Error -> PrimIO Bool
+
+isNull : Error -> IO Bool
+isNull e = primIO (ffi_isNull e)
+
+||| Checks if the error really occured
+occured : Error -> IO SomeError
+occured e = do
+  n <- isNull e
+  pure $ if n then NoError else HasError e
 
 namespace Row
 
@@ -86,63 +92,42 @@ namespace Database
   ffi_run : Database -> Sql -> (Error -> PrimIO ()) -> PrimIO ()
 
   export
-  run : HasIO io => Database -> Sql -> (Sql -> Error -> IO ()) -> io ()
-  run db sql onErr = do
-    primIO (ffi_run db sql (\e => toPrim $ onErr sql e))
-
-  -- TODO: Use SomeError
-  export
-  runP : Database -> Sql -> Promise (Maybe Error)
-  runP db sql = promisify
+  run : Database -> Sql -> Promise SomeError
+  run db sql = promisify
     (\ok, err => ffi_run db sql (\e => toPrim $ do
       mErr <- occured e
       ok mErr))
 
-  export
-  ignoreError : Sql -> Error -> IO ()
-  ignoreError _ _ = pure ()
+  -- TODO: Bring it back when needed.
+  -- %foreign "node:lambda: (db,s,p) => (db.run(s,[p]))"
+  -- ffi_runWith1 : Database -> String -> String -> PrimIO ()
 
-  %foreign "node:lambda: (db,s,p) => (db.run(s,[p]))"
-  ffi_runWith1 : Database -> String -> String -> PrimIO ()
-
-  export
-  runWith1 : Database -> Sql -> String -> IO ()
-  runWith1 db s p = primIO (ffi_runWith1 db s p)
+  -- export
+  -- runWith1 : Database -> Sql -> String -> IO ()
+  -- runWith1 db s p = primIO (ffi_runWith1 db s p)
 
   %foreign "node:lambda: (db,s,c) => (db.get(s,c))"
   ffi_get : Database -> String -> (Error -> Row -> PrimIO ()) -> PrimIO ()
 
   export
-  get : Database -> Sql -> (Error -> Row -> IO ()) -> IO ()
-  get db sql callback = primIO (ffi_get db sql (\err,row => toPrim $ callback err row))
-
-  export
-  getP : Database -> Sql -> Promise Row
-  getP db sql = promisify (\ok, err => ffi_get db sql (\e, row => toPrim $ do
+  get : Database -> Sql -> Promise (Either Error Row)
+  get db sql = promisify $ \ok, err => ffi_get db sql $ \e, row => toPrim $ do
     mErr <- occured e
     case mErr of
-      Nothing => ok row
-      Just e2 => err !(toString e2)))
+      NoError     => ok $ Right row
+      HasError e2 => ok $ Left e2
 
-  export
-  getP2 : Database -> Sql -> Promise (Either Error Row)
-  -- getP db sql = promisify (\ok, err => ffi_get db sql (\e, row => toPrim $ do
-  --   mErr <- occured e
-  --   case mErr of
-  --     Nothing => ok row
-  --     Just e2 => err !(toString e2)))
+  -- TODO: Uncomment when we need this.
+  -- %foreign "node:lambda: (db,s,row,comp) => (db.each(s, (e,r) => (row(e)(r)()), (e,c) => (comp(e)()) ))"
+  -- ffi_each
+  --   : Database -> String -> (Error -> Row -> PrimIO ()) -> (Error -> PrimIO ()) -> PrimIO ()
 
-
-  %foreign "node:lambda: (db,s,row,comp) => (db.each(s, (e,r) => (row(e)(r)()), (e,c) => (comp(e)()) ))"
-  ffi_each
-    : Database -> String -> (Error -> Row -> PrimIO ()) -> (Error -> PrimIO ()) -> PrimIO ()
-
-  export
-  each : Database -> Sql -> (Error -> Row -> IO ()) -> (Error -> IO ()) -> IO ()
-  each db s onRow onComplete
-    = primIO
-    $ ffi_each db s (\e,r => toPrim $ onRow e r)
-                    (\e   => toPrim $ onComplete e)
+  -- export
+  -- each : Database -> Sql -> (Error -> Row -> IO ()) -> (Error -> IO ()) -> IO ()
+  -- each db s onRow onComplete
+  --   = primIO
+  --   $ ffi_each db s (\e,r => toPrim $ onRow e r)
+  --                   (\e   => toPrim $ onComplete e)
 
 namespace SQLite
 
@@ -156,9 +141,11 @@ namespace SQLite
   require : HasIO io => io SQLite
   require = primIO (ffi_require ())
 
-  %foreign "node:lambda: (s,d) => (new s.Database(d,(e) => {if(e){throw e}}))"
-  ffi_database : SQLite -> String -> PrimIO Database
+  %foreign "node:lambda: (s,d,err) => (new s.Database(d,(e) => (err(e)())))"
+  ffi_database : SQLite -> String -> (Error -> PrimIO ()) -> PrimIO Database
 
   export
-  database : HasIO io => SQLite -> String -> io Database
-  database s db = primIO (ffi_database s db)
+  database : SQLite -> String -> Promise (Either Error Database)
+  database s dbStr = promisify (\ok, err => toPrim $ do
+    ok $ Right !(primIO $ ffi_database s dbStr (\e => toPrim (ok (Left e)))))
+

@@ -109,30 +109,30 @@ export
 runOrderDB : OrderDB a -> Promise (Either OrderDBError a)
 runOrderDB = runEitherT
 
-throwIfFail : (String -> OrderDBError) -> Promise (Maybe Error) -> OrderDB ()
+throwIfFail : (String -> OrderDBError) -> Promise SomeError -> OrderDB ()
 throwIfFail mkError p = do
-  Nothing <- lift p
-    | Just err => throwError $ mkError !(toString err)
+  NoError <- lift p
+    | HasError err => throwError $ mkError !(toString err)
   pure ()
 
 export
 saveAddress : Database -> AddressDTO -> OrderDB ()
 saveAddress db (MkAddressDTO identifier addressLine1 addressLine2 addressLine3 addressLine4 city zipCode) = do
-  throwIfFail SaveAddressError $ Database.runP db
+  throwIfFail SaveAddressError $ Database.run db
     ( "INSERT INTO address (id, line1, line2, line3, line4, city, zip)" ++
       "VALUES (\{show identifier},\{show addressLine1},\{renderMaybe addressLine2},\{renderMaybe addressLine3},\{renderMaybe addressLine4},\{show city},\{show zipCode})")
 
 export
 saveCustomer : Database -> CustomerDTO -> OrderDB ()
 saveCustomer db (MkCustomerDTO identifier firstName lastName emailAddress) = do
-  throwIfFail SaveCustomerError $ Database.runP db
+  throwIfFail SaveCustomerError $ Database.run db
     ( "INSERT INTO customer (id, first_name, last_name, email)" ++
       "VALUES (\{show identifier},\{show firstName},\{show lastName}, \{show emailAddress})")
 
 export
 savePricedOrderLine : Database -> PricedOrderLineDTO -> OrderDB ()
 savePricedOrderLine db (MkPricedOrderLineDTO identifier productCode quantity price) = do
-  throwIfFail SavePricedOrderLineError $ Database.runP db
+  throwIfFail SavePricedOrderLineError $ Database.run db
     ( "INSERT INTO priced_order_line (id,product_code,quantity,price)" ++
       "VALUES (\{show identifier},\{show productCode},\{show quantity},\{show price})" )
 
@@ -143,11 +143,11 @@ saveOrder db (MkPricedOrderDTO identifier customer shippingAddress billingAddres
   saveAddress db shippingAddress
   saveAddress db billingAddress
   traverse_ (savePricedOrderLine db) orderLines
-  throwIfFail SaveOrderError $ Database.runP db
+  throwIfFail SaveOrderError $ Database.run db
     ( "INSERT INTO priced_order (id,customer,shipping_address,billing_address,amount_to_bill)" ++
       "VALUES (\{show identifier},\{show customer.identifier},\{show shippingAddress.identifier},\{show billingAddress.identifier},\{show amount})" )
   for_ orderLines $ \(MkPricedOrderLineDTO orderIdentifier productCode quantity price) => do
-    throwIfFail SaveOrderError $ Database.runP db
+    throwIfFail SaveOrderError $ Database.run db
       ( "INSERT INTO priced_order_lines (ordr, order_line)" ++
         "VALUES (\{show identifier},\{show orderIdentifier})")
 
@@ -155,11 +155,11 @@ export
 initDB : IO ()
 initDB = do
   sqlite <- SQLite.require
-  db <- SQLite.database sqlite "./db/order.db"
   resolve' (\_ => putStrLn "OK.") putStrLn $ do
-    ignore $ Database.runP db addressTable
-    ignore $ Database.runP db customerTable
-    ignore $ Database.runP db pricedOrderLineTable
-    ignore $ Database.runP db orderLinesTable
-    ignore $ Database.runP db pricedOrderTable
+    db <- either !(SQLite.database sqlite "./db/order.db")
+    ignore $ Database.run db addressTable
+    ignore $ Database.run db customerTable
+    ignore $ Database.run db pricedOrderLineTable
+    ignore $ Database.run db orderLinesTable
+    ignore $ Database.run db pricedOrderTable
     ignore $ Database.close db

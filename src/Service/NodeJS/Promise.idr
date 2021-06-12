@@ -44,6 +44,12 @@ resolve' : (a -> IO ()) -> (String -> IO ()) -> Promise a -> IO ()
 resolve' ok err (MkPromise cmd) =
   cmd ok err
 
+||| On Left convert it to String and reject the promise, on Right resolve it.
+export
+either : Show e => Either e a -> Promise a
+either (Left x)  = reject $ show x
+either (Right x) = pure x
+
 export
 run : Promise a -> IO ()
 run p =

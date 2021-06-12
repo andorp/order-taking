@@ -137,21 +137,21 @@ mkRunBackend = do
   md5    <- MD5.require
   pure $ MkRunBackend $ \type, script => do
     -- TODO: Bracketing on exception.
-    orderDB   <- SQLite.database sqlite "./db/order.db"
-    productDB <- SQLite.database sqlite "./db/product.db"
-    Nothing <- SQLite.Database.runP orderDB   "begin"
-      | Just err => reject !(toString err)
-    Nothing <- SQLite.Database.runP productDB "begin"
-      | Just err => reject !(toString err)
+    orderDB   <- Promise.either !(SQLite.database sqlite "./db/order.db")
+    productDB <- Promise.either !(SQLite.database sqlite "./db/product.db")
+    NoError <- SQLite.Database.run orderDB "begin"
+      | HasError err => reject !(toString err)
+    NoError <- SQLite.Database.run productDB "begin"
+      | HasError err => reject !(toString err)
     let conn = MkDependencies md5 orderDB productDB
     x <- runReaderT conn (runEitherT (backend script))
     case x of
       Left _ => do
-        ignore $ SQLite.Database.runP orderDB   "rollback"
-        ignore $ SQLite.Database.runP productDB "rollback"
+        ignore $ SQLite.Database.run orderDB   "rollback"
+        ignore $ SQLite.Database.run productDB "rollback"
       Right _ => do
-        ignore $ SQLite.Database.runP orderDB   "commit"
-        ignore $ SQLite.Database.runP productDB "commit"
+        ignore $ SQLite.Database.run orderDB   "commit"
+        ignore $ SQLite.Database.run productDB "commit"
     SQLite.Database.close productDB
     SQLite.Database.close orderDB
     pure (the (Either PlaceOrderError type) x)

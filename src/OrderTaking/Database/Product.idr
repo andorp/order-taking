@@ -2,6 +2,8 @@ module OrderTaking.Database.Product
 
 import Data.String
 import Service.NodeJS.SQLite
+import Service.NodeJS.Promise
+
 
 productTable : String
 productTable =
@@ -25,15 +27,11 @@ productPrice : HasIO io => String -> io (Maybe Double)
 productPrice _ = pure $ Just 1.0
 -- TODO
 
-logError : String -> Error -> IO ()
-logError _ err = case !(occured err) of
-  Nothing => pure ()
-  Just e  => putStrLn !(toString e)
-
 export
 initDB : IO ()
 initDB = do
   sqlite <- SQLite.require
-  db <- SQLite.database sqlite "./db/product.db"
-  Database.run db productTable logError
-  Database.close db
+  resolve' (\_ => putStrLn "OK.") putStrLn $ do
+    db <- either !(SQLite.database sqlite "./db/product.db")
+    ignore $ Database.run db productTable
+    ignore $ Database.close db
