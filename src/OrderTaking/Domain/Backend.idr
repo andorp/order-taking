@@ -77,12 +77,72 @@ namespace DTO
       , price       = fromPrice po.linePrice
       }
 
+record OrderDB where
+  constructor MkOrderDB
+  dbConnection        : Type 
+  dbError             : Type
+  showDBError         : dbError -> String
+  initConnection      : Promise (Either dbError dbConnection)
+  closeConnection     : dbConnection -> Promise (Maybe dbError)
+  beginTransaction    : dbConnection -> Promise (Maybe dbError)
+  commitTransaction   : dbConnection -> Promise (Maybe dbError)
+  rollbackTransaction : dbConnection -> Promise (Maybe dbError)
+  saveOrder           : dbConnection -> PricedOrderDTO -> Promise (Maybe dbError)
+
+export
+orderDBSQLite : OrderDB
+orderDBSQLite = MkOrderDB
+  { dbConnection        = Database
+  , dbError             = OrderDBError
+  , showDBError         = show
+  , initConnection      = do
+      sqlite <- SQLite.require
+      map (mapFst (InitializeError . show)) $ SQLite.database sqlite "./db/order.db"
+  , closeConnection     = \db => Nothing <$ SQLite.Database.close db
+  , beginTransaction    = \db => map (map (InitializeError . show) . toMaybe) $ SQLite.Database.run db "begin"
+  , commitTransaction   = \db => map (map (InitializeError . show) . toMaybe) $ SQLite.Database.run db "commit"
+  , rollbackTransaction = \db => map (map (InitializeError . show) . toMaybe) $ SQLite.Database.run db "rollback"
+  , saveOrder           = \db, po => map (either Just (const Nothing)) $ runOrderDB $ Order.saveOrder db po
+  }
+
+record ProductDBComp where
+  constructor MkProductDBComp
+  dbConnection        : Type 
+  dbError             : Type
+  showDBError         : dbError -> String
+  initConnection      : Promise (Either dbError dbConnection)
+  closeConnection     : dbConnection -> Promise (Maybe dbError)
+  beginTransaction    : dbConnection -> Promise (Maybe dbError)
+  commitTransaction   : dbConnection -> Promise (Maybe dbError)
+  rollbackTransaction : dbConnection -> Promise (Maybe dbError)
+
+-- TODO: Implement
+export
+productDBSQlite : ProductDBComp
+productDBSQlite = MkProductDBComp
+  { dbConnection        = ()
+  , dbError             = String
+  , showDBError         = id
+  , initConnection      = pure (Right ())
+  , closeConnection     = \db => pure Nothing
+  , beginTransaction    = \db => pure Nothing
+  , commitTransaction   = \db => pure Nothing
+  , rollbackTransaction = \db => pure Nothing
+  }
 
 record Dependencies where
   constructor MkDependencies
-  md5Provider : MD5
-  orderDB     : Database
-  productDB   : Database
+  md5Provider   : MD5
+  orderDBComp   : OrderDB
+  orderDBConn   : orderDBComp.dbConnection
+  productDBComp : ProductDBComp
+  productDBConn : productDBComp.dbConnection
+
+orderDBDep : Dependencies -> (o : OrderDB ** o.dbConnection)
+orderDBDep d = (d.orderDBComp ** d.orderDBConn)
+
+productDBDep : Dependencies -> (p : ProductDBComp ** p.dbConnection)
+productDBDep d = (d.productDBComp ** d.productDBConn) 
 
 public export
 data Backend : Type -> Type where
@@ -131,32 +191,47 @@ runBackend : {a : Type} -> RunBackend -> Backend a -> Promise (Either PlaceOrder
 runBackend {a} (MkRunBackend r) = r a
 
 export
-mkRunBackend : IO RunBackend
+mkRunBackend
+  :  (orderDBComp   : OrderDB)
+  => (productDBComp : ProductDBComp)
+  => IO RunBackend
 mkRunBackend = do
   sqlite <- SQLite.require
   md5    <- MD5.require
   pure $ MkRunBackend $ \type, script => do
-    -- TODO: Bracketing on exception.
-    orderDB   <- Promise.either !(SQLite.database sqlite "./db/order.db")
-    productDB <- Promise.either !(SQLite.database sqlite "./db/product.db")
-    NoError <- SQLite.Database.run orderDB "begin"
-      | HasError err => reject !(toString err)
-    NoError <- SQLite.Database.run productDB "begin"
-      | HasError err => reject !(toString err)
-    let conn = MkDependencies md5 orderDB productDB
+    -- Open DB conenctions
+    orderDBConn
+      <- Promise.either
+          $ mapFst (OrderDB.showDBError orderDBComp)
+          $ !(OrderDB.initConnection orderDBComp)
+    productDBConn
+      <- Promise.either
+          $ mapFst (ProductDBComp.showDBError productDBComp)
+          $ !(ProductDBComp.initConnection productDBComp)
+    
+    -- Initialise transactions
+    Nothing <- orderDBComp.beginTransaction orderDBConn
+      | Just err => Promise.reject $ orderDBComp.showDBError err
+    Nothing <- productDBComp.beginTransaction productDBConn
+      | Just err => Promise.reject $ productDBComp.showDBError err
+
+    -- Run the backend computation
+    let conn = MkDependencies md5 orderDBComp orderDBConn productDBComp productDBConn
     x <- runReaderT conn (runEitherT (backend script))
     case x of
       Left _ => do
-        ignore $ SQLite.Database.run orderDB   "rollback"
-        ignore $ SQLite.Database.run productDB "rollback"
+        ignore $ orderDBComp.rollbackTransaction orderDBConn
+        ignore $ productDBComp.rollbackTransaction productDBConn
       Right _ => do
-        ignore $ SQLite.Database.run orderDB   "commit"
-        ignore $ SQLite.Database.run productDB "commit"
-    SQLite.Database.close productDB
-    SQLite.Database.close orderDB
+        ignore $ orderDBComp.commitTransaction orderDBConn
+        ignore $ productDBComp.commitTransaction productDBConn
+    
+    -- Try to close the connections
+    ignore $ productDBComp.closeConnection productDBConn
+    ignore $ orderDBComp.closeConnection orderDBConn
     pure (the (Either PlaceOrderError type) x)
 
-namespace Model2
+namespace Model
 
   newOrderId : Backend OrderId
   newOrderId = do
@@ -201,10 +276,10 @@ namespace Model2
 
   placePricedOrder : PricedOrder -> Backend ()
   placePricedOrder pricedOrder = do
-    db <- asks orderDB
-    Right x <- liftPromise $ runOrderDB $ Order.saveOrder db (toPricedOrderDTO pricedOrder)
-      | Left err => throwError $ MkPlaceOrderError $ show err
-    pure x
+    (orderDB ** orderDBConn) <- asks orderDBDep 
+    Nothing <- liftPromise $ orderDB.saveOrder orderDBConn (toPricedOrderDTO pricedOrder)
+      | Just err => throwError $ MkPlaceOrderError $ orderDB.showDBError err
+    pure ()
 
   createOrderAcknowledgementLetter : PricedOrder -> Backend HtmlString
   createOrderAcknowledgementLetter pricedOrder = do

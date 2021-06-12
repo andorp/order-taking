@@ -93,6 +93,7 @@ data OrderDBError
   | SaveCustomerError String
   | SavePricedOrderLineError String
   | SaveOrderError String
+  | InitializeError String
 
 export
 Show OrderDBError where
@@ -100,6 +101,7 @@ Show OrderDBError where
   showPrec d (SaveCustomerError         x) = "SaveCustomerError: " ++ x
   showPrec d (SavePricedOrderLineError  x) = "SavePricedOrderLineError: " ++ x
   showPrec d (SaveOrderError            x) = "SaveOrderError: " ++ x
+  showPrec d (InitializeError           x) = "InitializeError: " ++ x
 
 export
 OrderDB : Type -> Type

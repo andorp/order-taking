@@ -19,6 +19,11 @@ namespace Error
     = NoError
     | HasError Error
 
+  export
+  toMaybe : SomeError -> Maybe Error
+  toMaybe NoError      = Nothing
+  toMaybe (HasError e) = Just e
+
   %foreign "node:lambda: e => {return String(e);}"
   ffi_toString : Error -> PrimIO String
 
@@ -147,5 +152,8 @@ namespace SQLite
   export
   database : SQLite -> String -> Promise (Either Error Database)
   database s dbStr = promisify (\ok, err => toPrim $ do
-    ok $ Right !(primIO $ ffi_database s dbStr (\e => toPrim (ok (Left e)))))
+    ok $ Right !(primIO $ ffi_database s dbStr (\e => toPrim $ do
+      if !(isNull e)
+        then pure ()
+        else (ok (Left e)))))
 

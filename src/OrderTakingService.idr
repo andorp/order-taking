@@ -44,11 +44,14 @@ orderTaking rb req rsp = do
         }
   resolve (do
     orderEvents <- runBackend rb $ orderTakingWorkflow orderForm
-    Response.statusCode rsp 200
     Response.setHeader  rsp "Content-Type" "text/plain"
     case orderEvents of
-      Left err     => Response.end rsp $ "There was an error: " ++ show err
-      Right events => Response.end rsp $ unlines $ "Your order has taken!" :: map show events
+      Left err     => do
+        Response.statusCode rsp 400
+        Response.end rsp $ "There was an error: " ++ show err
+      Right events => do
+        Response.statusCode rsp 200
+        Response.end rsp $ unlines $ "Your order has taken!" :: map show events
     pure ())
     (\_ => pure ())
     (\err => do
@@ -66,6 +69,8 @@ initDB = do
 startService : IO ()
 startService = do
   putStrLn "Staring Order taking service."
+  let orderDBComp = orderDBSQLite
+  let productDBComp = productDBSQlite
   run <- mkRunBackend
   http   <- HTTP.require
   server <- HTTP.createServer http (orderTaking run)
