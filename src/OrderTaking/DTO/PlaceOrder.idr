@@ -6,6 +6,46 @@ import Rango.DataTransfer.SQL.Derive
 %language ElabReflection
 %default total
 
+-- Incoming information
+
+public export
+record AddressFormDTO where
+  constructor MkAddressFormDTO
+  addressLine1 : String
+  addressLine2 : String
+  addressLine3 : String
+  addressLine4 : String
+  city         : String
+  zipCode      : String
+
+public export
+record OrderLineFormDTO where
+  constructor MkOrderLineFormDTO
+  productCode : String
+  quantity    : String
+
+public export
+record CustomerFormDTO where
+  constructor MkCustomerFormDTO
+  firstName    : String
+  lastName     : String
+  emailAddress : String
+
+public export
+record OrderFormDTO where
+  constructor MkOrderFormDTO
+  customer        : CustomerFormDTO
+  shippingAddress : AddressFormDTO
+  billingAddress  : AddressFormDTO
+  orderLines      : List OrderLineFormDTO
+
+%runElab deriveJSON defaultOpts `{{AddressFormDTO}}
+%runElab deriveJSON defaultOpts `{{OrderLineFormDTO}}
+%runElab deriveJSON defaultOpts `{{CustomerFormDTO}}
+%runElab deriveJSON defaultOpts `{{OrderFormDTO}}
+
+-- Outgoing information
+
 public export
 Identifier : Type
 Identifier = String

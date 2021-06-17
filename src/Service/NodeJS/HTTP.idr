@@ -1,19 +1,23 @@
 module Service.NodeJS.HTTP
 
 import Data.String
-
+import Service.NodeJS.Promise
 
 namespace Request
 
   export
   data Request : Type where [external]
 
-  %foreign "node:lambda: (req, f) => {let data = '';req.on('data',chunk=>{data+=chunk;});req.on('end',()=> f(data););}"
+  %foreign "node:lambda: (req, f) => {let data = '';req.on('data',chunk=>{data+=chunk;});req.on('end',()=> f(data)());}"
   ffi_body : Request -> (String -> PrimIO ()) -> PrimIO ()
 
   export
-  body : Request -> (String -> IO ()) -> IO ()
-  body req f = primIO (ffi_body req (\str => toPrim (f str)))
+  %foreign "node:lambda: req => req.url"
+  url : Request -> String
+
+  export
+  body : Request -> Promise String
+  body req = promisify $ \ok, err => ffi_body req $ \content => toPrim $ ok content
 
 namespace Response
 

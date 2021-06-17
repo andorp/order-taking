@@ -18,8 +18,48 @@ import Service.NodeJS.MD5
 import Service.NodeJS.Date
 import Service.NodeJS.Promise
 
+namespace RequestDTO
 
-namespace DTO
+  export
+  orderForm : OrderFormDTO -> OrderForm
+
+  orderLineForm    : OrderLineFormDTO -> OrderLineForm
+  addressForm      : AddressFormDTO   -> AddressForm
+  customerInfoForm : CustomerFormDTO  -> CustomerInfoForm
+
+
+  orderForm dto = MkOrderForm
+    { customerInfo    = customerInfoForm dto.customer
+    , shippingAddress = addressForm dto.shippingAddress
+    , billingAddress  = addressForm dto.billingAddress
+    , orderLines      = map orderLineForm dto.orderLines
+    }
+
+  customerInfoForm dto = MkCustomerInfoForm
+    { firstName    = dto.firstName
+    , lastName     = dto.lastName
+    , emailAddress = dto.emailAddress
+    }
+
+  nonEmpty : String -> Maybe String
+  nonEmpty "" = Nothing
+  nonEmpty xs = Just xs
+
+  addressForm dto = MkAddressForm
+    { addressLine1 = dto.addressLine1
+    , addressLine2 = nonEmpty dto.addressLine2
+    , addressLine3 = nonEmpty dto.addressLine3
+    , addressLine4 = nonEmpty dto.addressLine4
+    , city         = dto.city
+    , zipCode      = dto.zipCode
+    }
+
+  orderLineForm dto = MkOrderLineForm
+    { productCode = dto.productCode
+    , quantity    = dto.quantity
+    }
+
+namespace DatabaseDTO
 
   orderIdentifier         : OrderId     -> Identifier
   orderLineIdentifier     : OrderLineId -> Identifier
@@ -231,25 +271,20 @@ mkRunBackend = do
     ignore $ orderDBComp.closeConnection orderDBConn
     pure (the (Either PlaceOrderError type) x)
 
+generateIdentifier : HasIO io => MD5 -> io String
+generateIdentifier md5 = do
+  n   <- Date.now
+  -- d   <- map (the Double) randomIO
+  let d = 1.0
+  MD5.create md5 (show n ++ show d)
+
 namespace Model
 
   newOrderId : Backend OrderId
-  newOrderId = do
-    n   <- Date.now
-    -- d   <- map (the Double) randomIO
-    let d = 1.0
-    md5 <- asks md5Provider
-    oid <- MD5.create md5 (show n ++ show d)
-    pure $ MkOrderId oid
+  newOrderId = MkOrderId <$> (generateIdentifier !(asks md5Provider))
 
   newOrderLineId : Backend OrderLineId
-  newOrderLineId = do
-    n    <- Date.now
-    -- d    <- map (the Double) randomIO
-    let d = 1.0
-    md5  <- asks md5Provider
-    olid <- MD5.create md5 (show n ++ show d)
-    pure $ MkOrderLineId olid
+  newOrderLineId = MkOrderLineId <$> (generateIdentifier !(asks md5Provider))
 
   checkProductCodeExists : ProductCode -> Backend Bool
   checkProductCodeExists (WidgetProduct (MkWidgetCode x)) = Database.Product.productCodeExists x

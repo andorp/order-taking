@@ -1,14 +1,18 @@
 module OrderTakingService
 
+import Language.JSON
+import Data.String
+import System
+
 import OrderTaking.Domain.PlaceOrder
 import OrderTaking.BoundedContext.PlaceOrder
 import OrderTaking.Database.Order
 import OrderTaking.Database.Product
 import OrderTaking.Domain.Backend
-import Language.JSON
+import OrderTaking.DTO.PlaceOrder
+
 import Rango.BoundedContext.Workflow
-import Data.String
-import System
+import Rango.DataTransfer.JSON.Interfaces
 
 import Service.NodeJS.HTTP
 import Service.NodeJS.SQLite
@@ -19,39 +23,31 @@ import Service.NodeJS.Promise
 
 orderTaking : RunBackend -> Request -> Response -> IO ()
 orderTaking rb req rsp = do
-  let addressForm = MkAddressForm
-        { addressLine1 = "Bright Street 55."
-        , addressLine2 = Nothing
-        , addressLine3 = Nothing
-        , addressLine4 = Nothing
-        , city         = "Los Angeles"
-        , zipCode      = "ZP-55-555"
-        }
-  let cusomterInfoForm = MkCustomerInfoForm 
-        { firstName = "John"
-        , lastName = "Doe"
-        , emailAddress = "john.doe@emial.com"
-        }
-  let orderLines = [ MkOrderLineForm
-        { productCode = "G125"
-        , quantity    = "3"
-        } ]
-  let orderForm = MkOrderForm
-        { customerInfo = cusomterInfoForm
-        , shippingAddress = addressForm
-        , billingAddress  = addressForm
-        , orderLines      = orderLines
-        }
   resolve (do
-    orderEvents <- runBackend rb $ orderTakingWorkflow orderForm
-    Response.setHeader  rsp "Content-Type" "text/plain"
+    content <- Request.body req
+    putStrLn content
+    Response.setHeader rsp "Content-Type" "application/json"
+    Response.setHeader rsp "Access-Control-Allow-Origin" "*"
+    let Just jsValue = JSON.parse content
+        | Nothing => do
+            putStrLn "Couldn't parse incoming JSON."
+            Response.statusCode rsp 400
+            Response.end rsp "{\"message\":\"Couldn't parse incoming JSON.\"}"
+    let Just orderFormDTO = the (Maybe OrderFormDTO) (fromJSON jsValue)
+        | Nothing => do
+            putStrLn "Couldn't parse JSValue."
+            Response.statusCode rsp 400
+            Response.end rsp "{\"message\":\"Couldn't parse DTO JSON.\"}"
+    orderEvents <- runBackend rb $ orderTakingWorkflow $ RequestDTO.orderForm orderFormDTO
     case orderEvents of
-      Left err     => do
+      Left err => do
+        putStrLn "There was an error: \{show err}"
         Response.statusCode rsp 400
-        Response.end rsp $ "There was an error: " ++ show err
+        Response.end rsp $ "{ \"message\": \"There was an error: " ++ show err ++ "\"}"
       Right events => do
+        putStrLn "Your order has taken!"
         Response.statusCode rsp 200
-        Response.end rsp $ unlines $ "Your order has taken!" :: map show events
+        Response.end rsp $ "{ \"message\": \"Your order has taken!\" }"
     pure ())
     (\_ => pure ())
     (\err => do
@@ -61,10 +57,17 @@ orderTaking rb req rsp = do
     orderTakingWorkflow : OrderForm -> Backend (List PlacedOrderEvent)
     orderTakingWorkflow orderForm = interpret backend $ morph withPOMMapping PlaceOrder.workflow $ orderForm
 
-initDB : IO ()
-initDB = do
-  Database.Order.initDB
-  Database.Product.initDB
+fourOfour : Request -> Response -> IO ()
+fourOfour req rsp = do
+  Response.setHeader  rsp "Content-Type" "plain/text"
+  Response.statusCode rsp 404
+  Response.end        rsp "Not found."
+
+dispatcher : RunBackend -> Request -> Response -> IO ()
+dispatcher runBackend req rsp = do
+  case Request.url req of
+    "/"           => orderTaking runBackend req rsp
+    _             => fourOfour req rsp
 
 startService : IO ()
 startService = do
@@ -73,8 +76,13 @@ startService = do
   let productDBComp = productDBSQlite
   run <- mkRunBackend
   http   <- HTTP.require
-  server <- HTTP.createServer http (orderTaking run)
+  server <- HTTP.createServer http (dispatcher run)
   Server.listen server 3000 "127.0.0.1"
+
+initDB : IO ()
+initDB = do
+  Database.Order.initDB
+  Database.Product.initDB
 
 main : IO ()
 main = do
