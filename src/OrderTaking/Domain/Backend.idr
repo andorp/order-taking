@@ -18,7 +18,7 @@ import Service.NodeJS.MD5
 import Service.NodeJS.Date
 import Service.NodeJS.Promise
 
-namespace RequestDTO
+namespace FromUpstream
 
   export
   orderForm : OrderFormDTO -> OrderForm
@@ -59,7 +59,7 @@ namespace RequestDTO
     , quantity    = dto.quantity
     }
 
-namespace DatabaseDTO
+namespace ToDownstream
 
   orderIdentifier         : OrderId     -> Identifier
   orderLineIdentifier     : OrderLineId -> Identifier
@@ -117,6 +117,16 @@ namespace DatabaseDTO
       , price       = fromPrice po.linePrice
       }
 
+namespace WriteModel
+
+  record Customer where
+    constructor MkCustomer
+
+namespace ReadModel 
+
+  record Customer where
+    constructor MkCustomer
+
 record OrderDB where
   constructor MkOrderDB
   dbConnection        : Type 
@@ -128,6 +138,16 @@ record OrderDB where
   commitTransaction   : dbConnection -> Promise (Maybe dbError)
   rollbackTransaction : dbConnection -> Promise (Maybe dbError)
   saveOrder           : dbConnection -> PricedOrderDTO -> Promise (Maybe dbError)
+  -- saveCustomer : dbConnection -> WriteModel.Cusomter -> Promise (Maybe dbError)
+  -- loadCusomter : dbConnection -> Promise (Either dbError ReadModel.Customer)
+
+{-
+• If the inner type is an DDD Entity, with its own identity, it should be
+stored in a separate table.
+• If the inner type is a DDD Value Object, without its own identity, it should
+be stored “inline” with the parent data.
+-}
+
 
 export
 orderDBSQLite : OrderDB

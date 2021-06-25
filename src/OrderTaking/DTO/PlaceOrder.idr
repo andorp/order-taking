@@ -7,6 +7,7 @@ import Rango.DataTransfer.SQL.Derive
 %default total
 
 -- Incoming information
+-- From Upstream system
 
 public export
 record AddressFormDTO where
@@ -45,6 +46,7 @@ record OrderFormDTO where
 %runElab deriveJSON defaultOpts `{{OrderFormDTO}}
 
 -- Outgoing information
+-- To Downstream system
 
 public export
 Identifier : Type

@@ -11,81 +11,73 @@ import Service.NodeJS.SQLite
 import Service.NodeJS.Promise
 
 
-createAddressTable : Command
-createAddressTable = CreateTable
+||| Value like table, meaning that it is highly redundant
+addressTable : Table
+addressTable = MkTable
   "address"
-  [ MkField "id"    SQL_Text [PrimaryKey]
-  , MkField "line1" SQL_Text [NotNull]
-  , MkField "line2" SQL_Text []
-  , MkField "line3" SQL_Text []
-  , MkField "line4" SQL_Text []
-  , MkField "city"  SQL_Text [NotNull]
-  , MkField "zip"   SQL_Text [NotNull]
+  [ field "id"    SQL_Text [PrimaryKey]
+  , field "line1" SQL_Text [NotNull]
+  , field "line2" SQL_Text []
+  , field "line3" SQL_Text []
+  , field "line4" SQL_Text []
+  , field "city"  SQL_Text [NotNull]
+  , field "zip"   SQL_Text [NotNull]
   ]
   []
+  YesOfCourseValid
 
-addressTable : String
-addressTable = renderCommand createAddressTable
-
-createCustomerTable : Command
-createCustomerTable = CreateTable
+customerTable : Table
+customerTable = MkTable
   "customer"
-  [ MkField "id"         SQL_Text [PrimaryKey]
-  , MkField "first_name" SQL_Text [NotNull]
-  , MkField "last_name"  SQL_Text [NotNull]
-  , MkField "email"      SQL_Text [NotNull]
+  [ field "id"         SQL_Text [PrimaryKey]
+  , field "first_name" SQL_Text [NotNull]
+  , field "last_name"  SQL_Text [NotNull]
+  , field "email"      SQL_Text [NotNull]
   ]
   [ Unique "email_unqiue" ["email"] ]
+  YesOfCourseValid
 
-customerTable : String
-customerTable = renderCommand createCustomerTable
-
-createPricedOrderLineTable : Command
-createPricedOrderLineTable = CreateTable
+pricedOrderLineTable : Table
+pricedOrderLineTable = MkTable
   "priced_order_line"
-  [ MkField "id"            SQL_Text     [PrimaryKey]
-  , MkField "product_code"  SQL_Text     [NotNull]
-  , MkField "quantity"      SQL_Double   [NotNull]
-  , MkField "price"         SQL_Double   [NotNull]
+  [ field "id"            SQL_Text     [PrimaryKey]
+  , field "product_code"  SQL_Text     [NotNull]
+  , field "quantity"      SQL_Double   [NotNull]
+  , field "price"         SQL_Double   [NotNull]
   ]
   []
+  YesOfCourseValid
 
-pricedOrderLineTable : String
-pricedOrderLineTable = renderCommand createPricedOrderLineTable
-
-createOrderLinesTable : Command
-createOrderLinesTable = CreateTable
+pricedOrderLinesTable : Table
+pricedOrderLinesTable = MkTable
   "priced_order_lines"
-  [ MkField "ordr"        SQL_Text [NotNull]
-  , MkField "order_line"  SQL_Text [NotNull]
+  [ field "ordr"        SQL_Text [NotNull]
+  , field "order_line"  SQL_Text [NotNull]
   ]
   [ ForeignKey "order_line" "priced_order_line" "id"
   , Unique "unique_key_lines" ["ordr", "order_line"]
   ]
+  YesOfCourseValid
 
-orderLinesTable : String
-orderLinesTable = renderCommand createOrderLinesTable
-
-createPricedOrderTable : Command
-createPricedOrderTable = CreateTable
+pricedOrderTable : Table
+pricedOrderTable = MkTable
   "priced_order"
-  [ MkField "id"                SQL_Text    [PrimaryKey]
-  , MkField "customer"          SQL_Text    [NotNull]
-  , MkField "shipping_address"  SQL_Text    [NotNull]
-  , MkField "billing_address"   SQL_Text    [NotNull]
-  , MkField "amount_to_bill"    SQL_Double  [NotNull]
+  [ field "id"                SQL_Text    [PrimaryKey]
+  , field "customer"          SQL_Text    [NotNull]
+  , field "shipping_address"  SQL_Text    [NotNull]
+  , field "billing_address"   SQL_Text    [NotNull]
+  , field "amount_to_bill"    SQL_Double  [NotNull]
   ]
   [ ForeignKey "customer"         "customer"    "id"
   , ForeignKey "shipping_address" "address"     "id"
   , ForeignKey "billing_address"  "address"     "id"
   ]
+  YesOfCourseValid
 
-pricedOrderTable : String
-pricedOrderTable = renderCommand createPricedOrderTable
-
-renderMaybe : Show a => Maybe a -> String
-renderMaybe Nothing  = "NULL"
-renderMaybe (Just x) = show x
+renderMaybe : {a : Type} -> Show a => Maybe a -> String
+renderMaybe Nothing             = "NULL"
+renderMaybe {a=String} (Just x) = x
+renderMaybe (Just x)            = show x
 
 public export
 data OrderDBError
@@ -120,23 +112,38 @@ throwIfFail mkError p = do
 export
 saveAddress : Database -> AddressDTO -> OrderDB ()
 saveAddress db (MkAddressDTO identifier addressLine1 addressLine2 addressLine3 addressLine4 city zipCode) = do
-  throwIfFail SaveAddressError $ Database.run db
-    ( "INSERT INTO address (id, line1, line2, line3, line4, city, zip)" ++
-      "VALUES (\{show identifier},\{show addressLine1},\{renderMaybe addressLine2},\{renderMaybe addressLine3},\{renderMaybe addressLine4},\{show city},\{show zipCode})")
+  throwIfFail SaveAddressError $ Database.run db $ renderCommand $
+    Insert addressTable
+      [ FieldOf "id"     (SQLText identifier)
+      , FieldOf "line1"  (SQLText addressLine1)
+      , FieldOf "line2"  (SQLText <$> addressLine2)
+      , FieldOf "line3"  (SQLText <$> addressLine3)
+      , FieldOf "line4"  (SQLText <$> addressLine4)
+      , FieldOf "city"   (SQLText city)
+      , FieldOf "zip"    (SQLText zipCode)
+      ]
 
 export
 saveCustomer : Database -> CustomerDTO -> OrderDB ()
 saveCustomer db (MkCustomerDTO identifier firstName lastName emailAddress) = do
-  throwIfFail SaveCustomerError $ Database.run db
-    ( "INSERT INTO customer (id, first_name, last_name, email)" ++
-      "VALUES (\{show identifier},\{show firstName},\{show lastName}, \{show emailAddress})")
+  throwIfFail SaveCustomerError $ Database.run db $ renderCommand $
+    Insert customerTable
+      [ FieldOf "id"          (SQLText emailAddress)
+      , FieldOf "first_name"  (SQLText firstName)
+      , FieldOf "last_name"   (SQLText lastName)
+      , FieldOf "email"       (SQLText emailAddress)
+      ]
 
 export
 savePricedOrderLine : Database -> PricedOrderLineDTO -> OrderDB ()
 savePricedOrderLine db (MkPricedOrderLineDTO identifier productCode quantity price) = do
-  throwIfFail SavePricedOrderLineError $ Database.run db
-    ( "INSERT INTO priced_order_line (id,product_code,quantity,price)" ++
-      "VALUES (\{show identifier},\{show productCode},\{show quantity},\{show price})" )
+  throwIfFail SavePricedOrderLineError $ Database.run db $ renderCommand $
+    Insert pricedOrderLineTable
+      [ FieldOf "id"            (SQLText identifier)
+      , FieldOf "product_code"  (SQLText productCode)
+      , FieldOf "quantity"      (SQLDouble quantity)
+      , FieldOf "price"         (SQLDouble price)
+      ]
 
 export
 saveOrder : Database -> PricedOrderDTO -> OrderDB ()
@@ -145,13 +152,20 @@ saveOrder db (MkPricedOrderDTO identifier customer shippingAddress billingAddres
   saveAddress db shippingAddress
   saveAddress db billingAddress
   traverse_ (savePricedOrderLine db) orderLines
-  throwIfFail SaveOrderError $ Database.run db
-    ( "INSERT INTO priced_order (id,customer,shipping_address,billing_address,amount_to_bill)" ++
-      "VALUES (\{show identifier},\{show customer.identifier},\{show shippingAddress.identifier},\{show billingAddress.identifier},\{show amount})" )
+  throwIfFail SaveOrderError $ Database.run db $ renderCommand $
+    Insert pricedOrderTable
+      [ FieldOf "id"               (SQLText identifier)
+      , FieldOf "customer"         (SQLText customer.identifier)
+      , FieldOf "shipping_address" (SQLText shippingAddress.identifier)
+      , FieldOf "billing_address"  (SQLText billingAddress.identifier)
+      , FieldOf "amount_to_bill"   (SQLDouble amount)
+      ]
   for_ orderLines $ \(MkPricedOrderLineDTO orderIdentifier productCode quantity price) => do
-    throwIfFail SaveOrderError $ Database.run db
-      ( "INSERT INTO priced_order_lines (ordr, order_line)" ++
-        "VALUES (\{show identifier},\{show orderIdentifier})")
+    throwIfFail SaveOrderError $ Database.run db $ renderCommand $
+      Insert pricedOrderLinesTable
+        [ FieldOf "ordr"        (SQLText identifier)
+        , FieldOf "order_line"  (SQLText orderIdentifier)
+        ]
 
 export
 initDB : IO ()
@@ -159,9 +173,9 @@ initDB = do
   sqlite <- SQLite.require
   resolve' (\_ => putStrLn "OK.") putStrLn $ do
     db <- either !(SQLite.database sqlite "./db/order.db")
-    ignore $ Database.run db addressTable
-    ignore $ Database.run db customerTable
-    ignore $ Database.run db pricedOrderLineTable
-    ignore $ Database.run db orderLinesTable
-    ignore $ Database.run db pricedOrderTable
+    ignore $ Database.run db $ renderCommand $ CreateTable addressTable
+    ignore $ Database.run db $ renderCommand $ CreateTable customerTable
+    ignore $ Database.run db $ renderCommand $ CreateTable pricedOrderLineTable
+    ignore $ Database.run db $ renderCommand $ CreateTable pricedOrderLinesTable
+    ignore $ Database.run db $ renderCommand $ CreateTable pricedOrderTable
     ignore $ Database.close db

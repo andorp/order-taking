@@ -38,7 +38,7 @@ orderTaking rb req rsp = do
             putStrLn "Couldn't parse JSValue."
             Response.statusCode rsp 400
             Response.end rsp "{\"message\":\"Couldn't parse DTO JSON.\"}"
-    orderEvents <- runBackend rb $ orderTakingWorkflow $ RequestDTO.orderForm orderFormDTO
+    orderEvents <- runBackend rb $ orderTakingWorkflow $ FromUpstream.orderForm orderFormDTO
     case orderEvents of
       Left err => do
         putStrLn "There was an error: \{show err}"

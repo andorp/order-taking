@@ -675,3 +675,5 @@ createEvents pricedOrder orderAcknowledgementSent =
 -- Page 178
 -- Page 195
 -- Page 220
+-- Page 239
+-- Page 251
