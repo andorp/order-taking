@@ -45,7 +45,7 @@ orderTaking rb req rsp = do
         Response.statusCode rsp 400
         Response.end rsp $ "{ \"message\": \"There was an error: " ++ show err ++ "\"}"
       Right events => do
-        putStrLn "Your order has taken!"
+        putStrLn $ show events
         Response.statusCode rsp 200
         Response.end rsp $ "{ \"message\": \"Your order has taken!\" }"
     pure ())

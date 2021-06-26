@@ -6,10 +6,11 @@ import Data.Strings
 import OrderTaking.Domain.Prelude
 import Rango.BoundedContext.Command
 
-export
-data Price = MkPrice Double
 
 namespace Price
+
+  export
+  data Price = MkPrice Double
 
   export
   create : Double -> Either String Price
@@ -117,6 +118,20 @@ productCodeStr (WidgetProduct (MkWidgetCode x)) = x
 productCodeStr (GizmoProduct (MkGizmoCode x)) = x
 
 public export
+record ProductForm where
+  constructor MkProductForm
+  productCode : String
+  price       : Double
+  description : String
+
+public export
+record Product where
+  constructor MkProduct
+  productCode : ProductCode
+  price       : Price
+  description : StringN 1000
+
+public export
 record OrderLineForm where
   constructor MkOrderLineForm
   productCode : String
@@ -213,12 +228,6 @@ record BillableOrderPlaced where
   billingAddress : BillingAddress
   amountToBill   : Price
 
-record PlaceOrderEvents where
-  constructor MkPlaceOrderEvents
-  acknowledgementSent : AcknowledgementLetter
-  orderPlaced         : OrderPlaced
-  billableOrderPlaced : BillableOrderPlaced
-
 data EnvelopeContents = MkEnvelopeContents (List String)
 
 data QuoteForm = MkQouteForm
@@ -240,6 +249,10 @@ data CheckedAddressValidationError
   = InvalidFormat String
   | AddressNotFound String
 
+Show CheckedAddressValidationError where
+  showPrec d (InvalidFormat x) = showCon d "InvalidFormat" $ showArg x
+  showPrec d (AddressNotFound x) = showCon d "AddressNotFound" $ showArg x
+
 data AddressValidationError
   = MkAddressLineError String
   | MkAddressOptLineError (Maybe String)
@@ -247,17 +260,39 @@ data AddressValidationError
   | MkAddressZipCodeError String
   | CheckedAddressError CheckedAddressValidationError
 
+Show AddressValidationError where
+  showPrec d (MkAddressLineError x)     = showCon d "MkAddressLineError" $ showArg x
+  showPrec d (MkAddressOptLineError x)  = showCon d "MkAddressOptLineError" $ showArg x
+  showPrec d (MkAddressCityError x)     = showCon d "MkAddressCityError" $ showArg x
+  showPrec d (MkAddressZipCodeError x)  = showCon d "MkAddressZipCodeError" $ showArg x
+  showPrec d (CheckedAddressError x)    = showCon d "CheckedAddressError" $ showArg x
+
 data NameValidationError = MkNameValidationError String String
+
+Show NameValidationError where
+  showPrec d (MkNameValidationError x y) = showCon d "MkNameValidationError" $ concatMap showArg [x, y]
 
 data EmailValidationError = MkEmailValidationError String
 
+Show EmailValidationError where
+  showPrec d (MkEmailValidationError x) = showCon d "MkEmailValidationError" $ showArg x
+
 data QuantityValidationError = MkQuantityValidationError String String
+
+Show QuantityValidationError where
+  showPrec d (MkQuantityValidationError x y) = showCon d "MkQuantityValidationError" $ concatMap showArg [x, y]
 
 data ValidationError
   = AddressValidation AddressValidationError
   | NameValidation NameValidationError
   | EmailValidation EmailValidationError
   | QuantityValidation QuantityValidationError
+
+Show ValidationError where
+  showPrec d (AddressValidation x)  = showCon d "AddressValidation"   $ showArg x
+  showPrec d (NameValidation x)     = showCon d "NameValidation"      $ showArg x
+  showPrec d (EmailValidation x)    = showCon d "EmailValidation"     $ showArg x
+  showPrec d (QuantityValidation x) = showCon d "QuantityValidation"  $ showArg x
 
 public export
 data CheckedAddress = MkCheckedAddress AddressForm
@@ -279,12 +314,19 @@ record OrderAcknowledgementSent where
 public export
 data ProductCodeErr = MkProductCodeErr String
 
+Show ProductCodeErr where
+  showPrec d (MkProductCodeErr x) = showCon d "MkProductCodeErr" $ showArg x
+
 export
 record InvalidOrder where
   constructor MkInvalidOrder
   order             : OrderForm
   validationErrors  : List ValidationError
   productCodeErrors : List ProductCodeErr
+
+Show InvalidOrder where
+  showPrec d (MkInvalidOrder order validationErrors productCodeErrors)
+    = showCon d "MkInvalidOrder" $ concat [showArg validationErrors, showArg productCodeErrors]
 
 public export
 data PlacedOrderEvent
@@ -295,10 +337,10 @@ data PlacedOrderEvent
 
 export
 Show PlacedOrderEvent where
-  show (OrderPlacedEvent x) = "PlacedOrderEvent"
+  show (OrderPlacedEvent         x) = "PlacedOrderEvent"
   show (BillableOrderPlacedEvent x) = "BillableOrderPlacedEvent"
   show (AcknowledgementSentEvent x) = "AcknowledgementSentEvent"
-  show (InvalidOrderRegistered x) = "InvalidOrderRegistered"
+  show (InvalidOrderRegistered   x) = "InvalidOrderRegistered: " ++ show x
 
 createBillingEvent : PricedOrder -> Maybe BillableOrderPlaced
 createBillingEvent pricedOrder = do
@@ -677,3 +719,4 @@ createEvents pricedOrder orderAcknowledgementSent =
 -- Page 220
 -- Page 239
 -- Page 251
+-- Page 263

@@ -17,6 +17,7 @@ import Service.NodeJS.SQLite
 import Service.NodeJS.MD5
 import Service.NodeJS.Date
 import Service.NodeJS.Promise
+import Service.NodeJS.Random
 
 namespace FromUpstream
 
@@ -26,7 +27,6 @@ namespace FromUpstream
   orderLineForm    : OrderLineFormDTO -> OrderLineForm
   addressForm      : AddressFormDTO   -> AddressForm
   customerInfoForm : CustomerFormDTO  -> CustomerInfoForm
-
 
   orderForm dto = MkOrderForm
     { customerInfo    = customerInfoForm dto.customer
@@ -70,6 +70,8 @@ namespace ToDownstream
   fromShippingAddress     : Identifier  -> ShippingAddress -> AddressDTO
   toPricedOrderLineDTO    : Identifier  -> PricedOrderLine -> PricedOrderLineDTO
   export toPricedOrderDTO : PricedOrder -> PricedOrderDTO
+
+  -- Order
 
   orderIdentifier     (MkOrderId x)     = x
   orderLineIdentifier (MkOrderLineId x) = x
@@ -117,15 +119,30 @@ namespace ToDownstream
       , price       = fromPrice po.linePrice
       }
 
-namespace WriteModel
+  -- Product
 
-  record Customer where
-    constructor MkCustomer
+  export toProductCodeDTO : ProductCode -> ProductCodeDTO
+  export toProductDTO : Product -> ProductDTO
 
-namespace ReadModel 
+  toProductCodeDTO (WidgetProduct (MkWidgetCode x)) = MkProductCodeDTO x
+  toProductCodeDTO (GizmoProduct (MkGizmoCode x))   = MkProductCodeDTO x
 
-  record Customer where
-    constructor MkCustomer
+  toProductDTO (MkProduct productCode price description)
+    = MkProductDTO
+      { productCode = toProductCodeDTO productCode
+      , price       = Price.value price
+      , description = StringN.value description
+      }
+
+-- namespace WriteModel
+
+--   record Customer where
+--     constructor MkCustomer
+
+-- namespace ReadModel 
+
+--   record Customer where
+--     constructor MkCustomer
 
 record OrderDB where
   constructor MkOrderDB
@@ -142,9 +159,9 @@ record OrderDB where
   -- loadCusomter : dbConnection -> Promise (Either dbError ReadModel.Customer)
 
 {-
-• If the inner type is an DDD Entity, with its own identity, it should be
+* If the inner type is an DDD Entity, with its own identity, it should be
 stored in a separate table.
-• If the inner type is a DDD Value Object, without its own identity, it should
+* If the inner type is a DDD Value Object, without its own identity, it should
 be stored “inline” with the parent data.
 -}
 
@@ -162,7 +179,7 @@ orderDBSQLite = MkOrderDB
   , beginTransaction    = \db => map (map (InitializeError . show) . toMaybe) $ SQLite.Database.run db "begin"
   , commitTransaction   = \db => map (map (InitializeError . show) . toMaybe) $ SQLite.Database.run db "commit"
   , rollbackTransaction = \db => map (map (InitializeError . show) . toMaybe) $ SQLite.Database.run db "rollback"
-  , saveOrder           = \db, po => map (either Just (const Nothing)) $ runOrderDB $ Order.saveOrder db po
+  , saveOrder           = \db, po => map (either Just (const Nothing)) $ runOrderDB db $ Order.saveOrder po
   }
 
 record ProductDBComp where
@@ -175,19 +192,24 @@ record ProductDBComp where
   beginTransaction    : dbConnection -> Promise (Maybe dbError)
   commitTransaction   : dbConnection -> Promise (Maybe dbError)
   rollbackTransaction : dbConnection -> Promise (Maybe dbError)
+  productPrice        : dbConnection -> ProductCodeDTO -> Promise (Either dbError Double)
+  productExists       : dbConnection -> ProductCodeDTO -> Promise (Either dbError Bool)
 
--- TODO: Implement
 export
 productDBSQlite : ProductDBComp
 productDBSQlite = MkProductDBComp
-  { dbConnection        = ()
-  , dbError             = String
-  , showDBError         = id
-  , initConnection      = pure (Right ())
-  , closeConnection     = \db => pure Nothing
-  , beginTransaction    = \db => pure Nothing
-  , commitTransaction   = \db => pure Nothing
-  , rollbackTransaction = \db => pure Nothing
+  { dbConnection        = Database
+  , dbError             = ProductDBError
+  , showDBError         = show
+  , initConnection      = do
+      sqlite <- SQLite.require
+      map (mapFst (InitializeError . show)) $ SQLite.database sqlite "./db/product.db"
+  , closeConnection     = \db => Nothing <$ SQLite.Database.close db
+  , beginTransaction    = \db => map (map (InitializeError . show) . toMaybe) $ SQLite.Database.run db "begin"
+  , commitTransaction   = \db => map (map (InitializeError . show) . toMaybe) $ SQLite.Database.run db "commit"
+  , rollbackTransaction = \db => map (map (InitializeError . show) . toMaybe) $ SQLite.Database.run db "rollback"
+  , productPrice        = \db, pc => runProductDB db $ Product.productPrice  pc
+  , productExists       = \db, pc => runProductDB db $ Product.productExists pc
   }
 
 record Dependencies where
@@ -293,10 +315,11 @@ mkRunBackend = do
 
 generateIdentifier : HasIO io => MD5 -> io String
 generateIdentifier md5 = do
-  n   <- Date.now
-  -- d   <- map (the Double) randomIO
-  let d = 1.0
-  MD5.create md5 (show n ++ show d)
+  n <- Date.now
+  d <- Random.double
+  idx <- MD5.create md5 (show n ++ show d)
+  putStrLn idx
+  pure idx
 
 namespace Model
 
@@ -307,28 +330,26 @@ namespace Model
   newOrderLineId = MkOrderLineId <$> (generateIdentifier !(asks md5Provider))
 
   checkProductCodeExists : ProductCode -> Backend Bool
-  checkProductCodeExists (WidgetProduct (MkWidgetCode x)) = Database.Product.productCodeExists x
-  checkProductCodeExists (GizmoProduct (MkGizmoCode x))   = Database.Product.productCodeExists x
-
+  checkProductCodeExists p = do
+    (productDB ** productDBConn) <- asks productDBDep
+    Right answer <- liftPromise $ productDB.productExists productDBConn (toProductCodeDTO p)
+      | Left err => throwError $ ProductCodeError $ MkProductCodeErr $ productDB.showDBError err
+    pure answer
+  
   checkAddressExists : AddressForm -> Backend (Either CheckedAddressValidationError CheckedAddress)
   checkAddressExists addressForm = do
     -- TODO: Address checker
     pure (Right (MkCheckedAddress addressForm))
 
   getProductPrice : ProductCode -> Backend Price
-  getProductPrice (WidgetProduct (MkWidgetCode x)) = do
-    Just priceInDB <- Database.Product.productPrice x
-      | Nothing => throwError (ProductCodeError (MkProductCodeErr "Price not found in database."))
-    let Right price = Price.create priceInDB
-        | Left err => throwError (PriceOrderError (MkPricingError err))
+  getProductPrice p = do
+    (productDB ** productDBConn) <- asks productDBDep
+    Right priceValue <- liftPromise $ productDB.productPrice productDBConn (toProductCodeDTO p)
+      | Left err      => throwError $ ProductCodeError $ MkProductCodeErr $ productDB.showDBError err
+    let Right price = Price.create priceValue
+        | Left err    => throwError $ ProductCodeError $ MkProductCodeErr err
     pure price
-  getProductPrice (GizmoProduct (MkGizmoCode x)) = do
-    Just priceInDB <- Database.Product.productPrice x
-      | Nothing => throwError (ProductCodeError (MkProductCodeErr "Price not found in database."))
-    let Right price = Price.create priceInDB
-        | Left err => throwError (PriceOrderError (MkPricingError err))
-    pure price
-
+  
   placePricedOrder : PricedOrder -> Backend ()
   placePricedOrder pricedOrder = do
     (orderDB ** orderDBConn) <- asks orderDBDep 

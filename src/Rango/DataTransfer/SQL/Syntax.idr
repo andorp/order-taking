@@ -1,6 +1,6 @@
 module Rango.DataTransfer.SQL.Syntax
 
-import public Data.List.Quantifiers
+import public Data.List.Quantifiers -- for HList
 
 import Data.String
 import Data.List
@@ -94,10 +94,13 @@ public export
 data FieldOfTy : String -> Type -> Type where
   FieldOf : (n : String) -> t -> FieldOfTy n t
 
+||| Calculate the list of types which is required for the insert command, skipping the
+||| auto incremental fields.
 public export
-FieldValues : List Field -> List Type
-FieldValues []        = []
-FieldValues (f :: fs) = FieldOfTy f.name (FieldType f) :: FieldValues fs
+InsertValues : List Field -> List Type
+InsertValues []        = []
+InsertValues (f@(MkField name sqlType primaryKey False notNull) :: fs) = FieldOfTy name (FieldType f) :: InsertValues fs
+InsertValues (f@(MkField name sqlType primaryKey True  notNull) :: fs) = InsertValues fs -- Do not ask for auto fields
 
 public export
 data Command : Type where
@@ -106,8 +109,11 @@ data Command : Type where
     -> Command
   Insert
     :  (table : Table)
-    -> (values : HList (FieldValues table.fields))
+    -> (values : HList (InsertValues table.fields))
     -> Command
+
+withCommas : List String -> String
+withCommas xs = concat (intersperse ", " xs)
 
 renderSQLType : SQLType -> String
 renderSQLType SQL_Integer   = "INTEGER"
@@ -118,9 +124,6 @@ renderModifier : Modifier -> String
 renderModifier PrimaryKey    = "PRIMARY KEY"
 renderModifier AutoIncrement = "AUTOINCREMENT"
 renderModifier NotNull       = "NOT NULL"
-
-withCommas : List String -> String
-withCommas xs = concat (intersperse ", " xs)
 
 renderConstraint : Constraint -> String
 renderConstraint (Unique name fields) =
@@ -137,6 +140,9 @@ renderSQLValue (SQLInteger x) = show x
 renderSQLValue (SQLText x)    = show x
 renderSQLValue (SQLDouble x)  = show x
 
+-- Instead of doing a lot of proof around the type safety of this construction, we use
+-- type level programming in a local hack and we dispatch on the type that we expect to
+-- see in these cases. Use this function with care.
 renderFieldValue : {t : Type} -> t -> String
 renderFieldValue {t=FieldOfTy n s} (FieldOf _ x) = renderFieldValue x
 renderFieldValue {t=Maybe (SQLValue s)} (Just x) = renderFieldValue x
@@ -146,13 +152,20 @@ renderFieldValue _ = "(╯°□°)╯︵ ┻━┻" -- This shouldn't happen
 
 -- This HList should contain a list of FieldOfTy entries, but we don't
 -- check type-safety here, instead we just dynamically dispatch on the
--- actual type case at runtime and render the field.
-renderHListValues : {ts : List Type} -> HList ts -> List String
-renderHListValues []        = []
-renderHListValues (a :: as) = renderFieldValue a :: renderHListValues as
+-- actual type case and render the field, or render gibberish if we got the
+-- types wrong. Use this function with care.
+renderInsertValues : {ts : List Type} -> HList ts -> List String
+renderInsertValues []        = []
+renderInsertValues (a :: as) = renderFieldValue a :: renderInsertValues as
+
+renderInsertNames : List Field -> List String
+renderInsertNames [] = []
+renderInsertNames ((MkField name sqlType primaryKey False notNull) :: xs) = name :: renderInsertNames xs
+renderInsertNames ((MkField name sqlType primaryKey True  notNull) :: xs) = renderInsertNames xs
 
 export
 renderCommand : Command -> String
-renderCommand (CreateTable table) =
-  "CREATE TABLE \{table.name} (\{withCommas (map renderCreateField table.fields ++ map renderConstraint table.constraints)})"
-renderCommand (Insert table values) = "INSERT INTO \{table.name} (\{withCommas (map Field.name table.fields)}) VALUES (\{withCommas (renderHListValues values)})"
+renderCommand (CreateTable table)
+  = "CREATE TABLE \{table.name} (\{withCommas (map renderCreateField table.fields ++ map renderConstraint table.constraints)})"
+renderCommand (Insert table values)
+  = "INSERT INTO \{table.name} (\{withCommas (renderInsertNames table.fields)}) VALUES (\{withCommas (renderInsertValues values)})"

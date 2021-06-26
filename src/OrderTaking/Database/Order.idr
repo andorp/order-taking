@@ -3,12 +3,14 @@ module OrderTaking.Database.Order
 import public Control.Monad.Either
 
 import Data.String
-import OrderTaking.DTO.PlaceOrder
-import Rango.DataTransfer.SQL.Syntax
 import Control.Monad.Trans
+import Control.Monad.Reader
 
+import Rango.DataTransfer.SQL.Syntax
 import Service.NodeJS.SQLite
 import Service.NodeJS.Promise
+
+import OrderTaking.DTO.PlaceOrder
 
 
 ||| Value like table, meaning that it is highly redundant
@@ -74,11 +76,6 @@ pricedOrderTable = MkTable
   ]
   YesOfCourseValid
 
-renderMaybe : {a : Type} -> Show a => Maybe a -> String
-renderMaybe Nothing             = "NULL"
-renderMaybe {a=String} (Just x) = x
-renderMaybe (Just x)            = show x
-
 public export
 data OrderDBError
   = SaveAddressError String
@@ -97,21 +94,22 @@ Show OrderDBError where
 
 export
 OrderDB : Type -> Type
-OrderDB a = EitherT OrderDBError Promise a
+OrderDB a = EitherT OrderDBError (ReaderT Database Promise) a
 
 export
-runOrderDB : OrderDB a -> Promise (Either OrderDBError a)
-runOrderDB = runEitherT
+runOrderDB : Database -> OrderDB a -> Promise (Either OrderDBError a)
+runOrderDB db m = runReaderT db (runEitherT m)
 
 throwIfFail : (String -> OrderDBError) -> Promise SomeError -> OrderDB ()
 throwIfFail mkError p = do
-  NoError <- lift p
+  NoError <- lift (lift p)
     | HasError err => throwError $ mkError !(toString err)
   pure ()
 
 export
-saveAddress : Database -> AddressDTO -> OrderDB ()
-saveAddress db (MkAddressDTO identifier addressLine1 addressLine2 addressLine3 addressLine4 city zipCode) = do
+saveAddress : AddressDTO -> OrderDB ()
+saveAddress (MkAddressDTO identifier addressLine1 addressLine2 addressLine3 addressLine4 city zipCode) = do
+  db <- ask
   throwIfFail SaveAddressError $ Database.run db $ renderCommand $
     Insert addressTable
       [ FieldOf "id"     (SQLText identifier)
@@ -124,8 +122,9 @@ saveAddress db (MkAddressDTO identifier addressLine1 addressLine2 addressLine3 a
       ]
 
 export
-saveCustomer : Database -> CustomerDTO -> OrderDB ()
-saveCustomer db (MkCustomerDTO identifier firstName lastName emailAddress) = do
+saveCustomer : CustomerDTO -> OrderDB ()
+saveCustomer (MkCustomerDTO identifier firstName lastName emailAddress) = do
+  db <- ask
   throwIfFail SaveCustomerError $ Database.run db $ renderCommand $
     Insert customerTable
       [ FieldOf "id"          (SQLText emailAddress)
@@ -135,8 +134,9 @@ saveCustomer db (MkCustomerDTO identifier firstName lastName emailAddress) = do
       ]
 
 export
-savePricedOrderLine : Database -> PricedOrderLineDTO -> OrderDB ()
-savePricedOrderLine db (MkPricedOrderLineDTO identifier productCode quantity price) = do
+savePricedOrderLine : PricedOrderLineDTO -> OrderDB ()
+savePricedOrderLine (MkPricedOrderLineDTO identifier productCode quantity price) = do
+  db <- ask
   throwIfFail SavePricedOrderLineError $ Database.run db $ renderCommand $
     Insert pricedOrderLineTable
       [ FieldOf "id"            (SQLText identifier)
@@ -146,12 +146,13 @@ savePricedOrderLine db (MkPricedOrderLineDTO identifier productCode quantity pri
       ]
 
 export
-saveOrder : Database -> PricedOrderDTO -> OrderDB ()
-saveOrder db (MkPricedOrderDTO identifier customer shippingAddress billingAddress orderLines amount) = do
-  saveCustomer db customer
-  saveAddress db shippingAddress
-  saveAddress db billingAddress
-  traverse_ (savePricedOrderLine db) orderLines
+saveOrder : PricedOrderDTO -> OrderDB ()
+saveOrder (MkPricedOrderDTO identifier customer shippingAddress billingAddress orderLines amount) = do
+  db <- ask
+  saveCustomer customer
+  saveAddress shippingAddress
+  saveAddress billingAddress
+  traverse_ savePricedOrderLine orderLines
   throwIfFail SaveOrderError $ Database.run db $ renderCommand $
     Insert pricedOrderTable
       [ FieldOf "id"               (SQLText identifier)

@@ -100,6 +100,7 @@ namespace Database
   run : Database -> Sql -> Promise SomeError
   run db sql = promisify
     (\ok, err => ffi_run db sql (\e => toPrim $ do
+      putStrLn sql -- TODO: Better logging
       mErr <- occured e
       ok mErr))
 

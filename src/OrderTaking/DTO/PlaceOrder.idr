@@ -40,13 +40,21 @@ record OrderFormDTO where
   billingAddress  : AddressFormDTO
   orderLines      : List OrderLineFormDTO
 
+public export
+record ProductFormDTO where
+  constructor MkProductFormDTO
+  productCode : String
+  price       : Double
+  description : String
+
 %runElab deriveJSON defaultOpts `{{AddressFormDTO}}
 %runElab deriveJSON defaultOpts `{{OrderLineFormDTO}}
 %runElab deriveJSON defaultOpts `{{CustomerFormDTO}}
 %runElab deriveJSON defaultOpts `{{OrderFormDTO}}
+%runElab deriveJSON defaultOpts `{{ProductFormDTO}}
 
 -- Outgoing information
--- To Downstream system
+-- To Database
 
 public export
 Identifier : Type
@@ -105,6 +113,18 @@ record PricedOrderDTO where
   orderLines      : List PricedOrderLineDTO
   amount          : Double
 
+public export
+record ProductCodeDTO where
+  constructor MkProductCodeDTO
+  productCode : String
+
+public export
+record ProductDTO where
+  constructor MkProductDTO
+  productCode : ProductCodeDTO
+  price       : Double
+  description : String
+
 %runElab deriveJSON defaultOpts `{{AddressDTO}}
 %runElab deriveJSON defaultOpts `{{OrderLineDTO}}
 %runElab deriveJSON defaultOpts `{{PricedOrderLineDTO}}
@@ -112,19 +132,15 @@ record PricedOrderDTO where
 %runElab deriveJSON defaultOpts `{{OrderDTO}}
 %runElab deriveJSON defaultOpts `{{PricedOrderDTO}}
 
--- %runElab deriveSQL `{{AddressDTO}}
--- %runElab deriveSQL `{{OrderLineDTO}}
--- %runElab deriveSQL `{{CustomerDTO}}
--- %runElab deriveSQL `{{OrderDTO}}
+%runElab deriveJSON defaultOpts `{{ProductCodeDTO}}
+%runElab deriveJSON defaultOpts `{{ProductDTO}}
 
--- -- TODO: HKD framework for SQL like data transfer
+-- Outgoing information
+-- To Downstream systems
+
 -- public export
--- record AddressHKDTO (field : Type -> Type) where
---   constructor MkAddressHKDTO
---   identifier   : field Identifier
---   addressLine1 : field String
---   addressLine2 : field (Maybe String)
---   addressLine3 : field (Maybe String)
---   addressLine4 : field (Maybe String)
---   city         : field String
---   zipCode      : field String
+-- data PlacedOrderEvent
+--   = OrderPlacedEvent         PricedOrder
+--   | BillableOrderPlacedEvent BillableOrderPlaced
+--   | AcknowledgementSentEvent OrderAcknowledgementSent
+--   | InvalidOrderRegistered   InvalidOrder
