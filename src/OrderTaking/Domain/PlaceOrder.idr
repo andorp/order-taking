@@ -87,10 +87,14 @@ record Address where
   zipCode      : ZipCode
 
 public export
-data ShippingAddress = MkShippingAddress Address
+record ShippingAddress where
+  constructor MkShippingAddress
+  address : Address
 
 public export
-data BillingAddress = MkBillingAddress Address
+record BillingAddress where
+  constructor MkBillingAddress
+  address : Address
 
 public export
 data WidgetCode = MkWidgetCode String
@@ -104,18 +108,21 @@ data GizmoCode = MkGizmoCode String
 mkGizmoCode : String -> Maybe GizmoCode
 mkGizmoCode = Just . MkGizmoCode -- TODO
 
-public export
-data ProductCode
-  = WidgetProduct WidgetCode
-  | GizmoProduct GizmoCode
+namespace ProductCode
 
-mkProductCode : String -> Maybe ProductCode
-mkProductCode str = map WidgetProduct $ mkWidgetCode str
+  public export
+  data ProductCode
+    = WidgetProduct WidgetCode
+    | GizmoProduct GizmoCode
 
-export
-productCodeStr : ProductCode -> String
-productCodeStr (WidgetProduct (MkWidgetCode x)) = x
-productCodeStr (GizmoProduct (MkGizmoCode x)) = x
+  export
+  mkProductCode : String -> Maybe ProductCode
+  mkProductCode str = map WidgetProduct $ mkWidgetCode str
+
+  export
+  value : ProductCode -> String
+  value (WidgetProduct (MkWidgetCode x)) = x
+  value (GizmoProduct (MkGizmoCode x)) = x
 
 public export
 record ProductForm where
@@ -174,11 +181,23 @@ namespace OrderQuantity
   value (OrderUnitQuantity     (MkUnitQuantity x))     = fromInteger $ value x
   value (OrderKilogramQuantity (MkKilogramQuantity x)) = Between.value x
 
-public export
-data OrderId = MkOrderId String
+namespace OrderId
 
-public export
-data OrderLineId = MkOrderLineId String
+  public export
+  data OrderId = MkOrderId String
+
+  export
+  value : OrderId -> String
+  value (MkOrderId x) = x
+
+namespace OrderLineId
+
+  public export
+  data OrderLineId = MkOrderLineId String
+
+  export
+  value : OrderLineId -> String
+  value (MkOrderLineId x) = x
 
 public export
 record OrderLine where
@@ -201,7 +220,7 @@ public export
 record PricedOrderLine where
   constructor MkPricedOrderLine
   orderLine : OrderLine
-  linePrice : Price
+  price     : Price
 
 public export
 record PricedOrder where
@@ -210,7 +229,7 @@ record PricedOrder where
   customerInfo    : CustomerInfo
   shippingAddress : ShippingAddress
   billingAddress  : BillingAddress
-  orderLine       : List PricedOrderLine
+  orderLines      : List PricedOrderLine
   amountToBill    : Price
 
 data AcknowledgementLetter = MkAcknowledgementLetter
@@ -220,8 +239,7 @@ record PlacedOrderAcknowledgement where
   pricedOrder           : PricedOrder
   acknowledgementLetter : AcknowledgementLetter
 
-data OrderPlaced = MkOrderPlaced
-
+public export
 record BillableOrderPlaced where
   constructor MkBillableOrderPlaced
   orderId        : OrderId
@@ -253,6 +271,7 @@ Show CheckedAddressValidationError where
   showPrec d (InvalidFormat x) = showCon d "InvalidFormat" $ showArg x
   showPrec d (AddressNotFound x) = showCon d "AddressNotFound" $ showArg x
 
+public export
 data AddressValidationError
   = MkAddressLineError String
   | MkAddressOptLineError (Maybe String)
@@ -267,21 +286,33 @@ Show AddressValidationError where
   showPrec d (MkAddressZipCodeError x)  = showCon d "MkAddressZipCodeError" $ showArg x
   showPrec d (CheckedAddressError x)    = showCon d "CheckedAddressError" $ showArg x
 
-data NameValidationError = MkNameValidationError String String
+public export
+record NameValidationError where
+  constructor MkNameValidationError
+  field : String
+  value : String
 
 Show NameValidationError where
   showPrec d (MkNameValidationError x y) = showCon d "MkNameValidationError" $ concatMap showArg [x, y]
 
-data EmailValidationError = MkEmailValidationError String
+public export
+record EmailValidationError where
+  constructor MkEmailValidationError
+  message : String
 
 Show EmailValidationError where
   showPrec d (MkEmailValidationError x) = showCon d "MkEmailValidationError" $ showArg x
 
-data QuantityValidationError = MkQuantityValidationError String String
+public export
+record QuantityValidationError where
+  constructor MkQuantityValidationError
+  condition : String
+  message   : String
 
 Show QuantityValidationError where
   showPrec d (MkQuantityValidationError x y) = showCon d "MkQuantityValidationError" $ concatMap showArg [x, y]
 
+public export
 data ValidationError
   = AddressValidation AddressValidationError
   | NameValidation NameValidationError
@@ -306,6 +337,7 @@ record OrderAcknowledgement where
   emailAddress : EmailAddress
   letter       : HtmlString
 
+public export
 record OrderAcknowledgementSent where
   constructor MkOrderAcknowledgementSent
   orderId      : OrderId
@@ -317,7 +349,7 @@ data ProductCodeErr = MkProductCodeErr String
 Show ProductCodeErr where
   showPrec d (MkProductCodeErr x) = showCon d "MkProductCodeErr" $ showArg x
 
-export
+public export
 record InvalidOrder where
   constructor MkInvalidOrder
   order             : OrderForm
@@ -653,24 +685,24 @@ validateOrder orderForm = do
 toPricedOrderLine : OrderLine -> POM PricedOrderLine
 toPricedOrderLine orderLine = do
   let quantity = OrderQuantity.value $ orderLine.quantity
-  price <- GetProductPrice $ orderLine.productCode
-  let linePrice = multiply price quantity
+  priceVal <- GetProductPrice $ orderLine.productCode
+  let price = multiply priceVal quantity
   pure $ MkPricedOrderLine
     { orderLine = orderLine
-    , linePrice = linePrice
+    , price     = price
     }
 
 export
 priceOrder : Order -> POM PricedOrder
 priceOrder order = do
   pricedOrderLines <- traverse toPricedOrderLine order.orderLines
-  let amountToBill = sumPrices $ map linePrice pricedOrderLines
+  let amountToBill = sumPrices $ map price pricedOrderLines
   pure $ MkPricedOrder
     { orderId         = order.orderId
     , customerInfo    = order.customerInfo
     , shippingAddress = order.shippingAddress
     , billingAddress  = order.billingAddress
-    , orderLine       = pricedOrderLines
+    , orderLines      = pricedOrderLines
     , amountToBill    = amountToBill
     }
 

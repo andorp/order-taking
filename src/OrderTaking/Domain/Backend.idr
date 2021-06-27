@@ -59,7 +59,7 @@ namespace FromUpstream
     , quantity    = dto.quantity
     }
 
-namespace ToDownstream
+namespace ToDatabase
 
   orderIdentifier         : OrderId     -> Identifier
   orderLineIdentifier     : OrderLineId -> Identifier
@@ -83,7 +83,7 @@ namespace ToDownstream
           , customer        = toCustomerDTO                  oid p.customerInfo
           , shippingAddress = fromShippingAddress            oid p.shippingAddress
           , billingAddress  = fromBillingAddress             oid p.billingAddress
-          , orderLines      = map (toPricedOrderLineDTO oid) p.orderLine
+          , orderLines      = map (toPricedOrderLineDTO oid) p.orderLines
           , amount          = fromPrice                      p.amountToBill
           }
 
@@ -114,9 +114,9 @@ namespace ToDownstream
   toPricedOrderLineDTO i po
     = MkPricedOrderLineDTO
       { identifier  = i ++ "-PO-" ++ orderLineIdentifier po.orderLine.orderLineId
-      , productCode = productCodeStr po.orderLine.productCode
+      , productCode = value po.orderLine.productCode
       , quantity    = OrderQuantity.value po.orderLine.quantity
-      , price       = fromPrice po.linePrice
+      , price       = fromPrice po.price
       }
 
   -- Product
@@ -133,6 +133,93 @@ namespace ToDownstream
       , price       = Price.value price
       , description = StringN.value description
       }
+
+namespace ToDownstream
+
+  export toPlaceOrderEventDTO   : PlacedOrderEvent -> PlaceOrderEventDTO
+
+  toPricedOrderDsDTO            : PricedOrder -> PricedOrderDsDTO
+  toPricedOrderLineDsDTO        : PricedOrderLine -> PricedOrderLineDsDTO
+  toAddressDsDTO                : Address -> AddressDsDTO
+  toBillableOrderPlacedDTO      : BillableOrderPlaced -> BillableOrderPlacedDTO
+  toAcknowledgementSentDTO      : OrderAcknowledgementSent -> OrderAcknowledgementSentDTO
+  toAddressValidationErrorDTO   : AddressValidationError -> AddressValidationErrorDTO
+  toNameValidationErrorDTO      : NameValidationError -> NameValidationErrorDTO
+  toEmailValidationErrorDTO     : EmailValidationError -> EmailValidationErrorDTO
+  toQuantityValidationErrorDTO  : QuantityValidationError -> QuantityValidationErrorDTO
+  toValidationErrorDTO          : ValidationError -> ValidationErrorDTO
+  toProductCodeErrorDTO         : ProductCodeErr -> ProductCodeErrDTO
+  toInvalidOrderDTO             : InvalidOrder -> InvalidOrderDTO
+
+  toPlaceOrderEventDTO (OrderPlacedEvent         x) = OrderPlacedEvent          (toPricedOrderDsDTO x)
+  toPlaceOrderEventDTO (BillableOrderPlacedEvent x) = BillableOrderPlacedEvent  (toBillableOrderPlacedDTO x)
+  toPlaceOrderEventDTO (AcknowledgementSentEvent x) = AcknowledgementSentEvent  (toAcknowledgementSentDTO x)
+  toPlaceOrderEventDTO (InvalidOrderRegistered   x) = InvalidOrderRegistered    (toInvalidOrderDTO x)
+
+  toPricedOrderDsDTO po = MkPricedOrderDsDTO
+    { orderId       = value po.orderId
+    , orderLines    = map toPricedOrderLineDsDTO po.orderLines
+    , amountToBill  = value po.amountToBill
+    }
+
+  toPricedOrderLineDsDTO pol = MkPricedOrderLineDsDTO
+    { orderLineId = value pol.orderLine.orderLineId
+    , productCode = value pol.orderLine.productCode
+    , price       = value pol.price
+    }
+
+  toAddressDsDTO a = MkAddressDsDTO
+    { addressLine1 = value a.addressLine1
+    , addressLine2 = maybe "" value a.addressLine2
+    , addressLine3 = maybe "" value a.addressLine3
+    , addressLine4 = maybe "" value a.addressLine4
+    , city         = value a.city
+    , zipCode      = value a.zipCode
+    }
+
+  toBillableOrderPlacedDTO bop = MkBillableOrderPlacedDTO
+    { orderId         = value bop.orderId
+    , billingAddress  = toAddressDsDTO bop.billingAddress.address
+    , amountToBill    = value bop.amountToBill
+    }
+
+  toAcknowledgementSentDTO as = MkOrderAcknowledgementSentDTO
+    { orderId      = value as.orderId
+    , emailAddress = value as.emailAddress
+    }
+
+  toCheckedAddressValidationErrorDTO : CheckedAddressValidationError -> CheckedAddressValidationErrorDTO
+  toCheckedAddressValidationErrorDTO (InvalidFormat   x) = InvalidFormat x
+  toCheckedAddressValidationErrorDTO (AddressNotFound x) = AddressNotFound x
+
+  toAddressValidationErrorDTO (MkAddressLineError     x) = MkAddressLineError x
+  toAddressValidationErrorDTO (MkAddressOptLineError  x) = MkAddressOptLineError x
+  toAddressValidationErrorDTO (MkAddressCityError     x) = MkAddressCityError x
+  toAddressValidationErrorDTO (MkAddressZipCodeError  x) = MkAddressZipCodeError x
+  toAddressValidationErrorDTO (CheckedAddressError    x) = CheckedAddressError (toCheckedAddressValidationErrorDTO x)
+
+  toNameValidationErrorDTO vne = MkNameValidationErrorDTO
+    { field = vne.field
+    , value = vne.value
+    }
+  
+  toEmailValidationErrorDTO (MkEmailValidationError message)
+    = MkEmailValidationErrorDTO message
+
+  toQuantityValidationErrorDTO (MkQuantityValidationError condition message)
+    = MkQuantityValidationErrorDTO condition message
+
+  toValidationErrorDTO (AddressValidation   x) = AddressValidation  (toAddressValidationErrorDTO x)
+  toValidationErrorDTO (NameValidation      x) = NameValidation     (toNameValidationErrorDTO x)
+  toValidationErrorDTO (EmailValidation     x) = EmailValidation    (toEmailValidationErrorDTO x)
+  toValidationErrorDTO (QuantityValidation  x) = QuantityValidation (toQuantityValidationErrorDTO x)
+
+  -- toProductCodeErrorDTO : ProductCodeErr -> ProductCodeErrDTO
+
+  toInvalidOrderDTO io = MkInvalidOrderDTO
+    { validationErrors = map toValidationErrorDTO io.validationErrors
+    , productCodeErrors = map toProductCodeErrorDTO io.productCodeErrors
+    }
 
 -- namespace WriteModel
 
