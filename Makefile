@@ -6,7 +6,7 @@ init: FORCE
 	test -d build || mkdir build
 	touch service/order-taking-service.js
 
-build: src order-taking-service.ipkg FORCE
+typecheck: src order-taking-service.ipkg FORCE
 	$(idris2) --typecheck order-taking-service.ipkg --codegen node
 
 FORCE:
