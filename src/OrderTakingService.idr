@@ -43,15 +43,18 @@ orderTaking rb req rsp = do
       Left err => do
         putStrLn "There was an error: \{show err}"
         Response.statusCode rsp 400
-        Response.end rsp $ "{ \"message\": \"There was an error: " ++ show err ++ "\"}"
+        Response.end rsp $ "{ \"error\":\"400\", \"message\": \"There was an error: " ++ show err ++ "\"}"
       Right events => do
         putStrLn $ show events
         Response.statusCode rsp 200
-        Response.end rsp $ "{ \"message\": \"Your order has taken!\" }"
+        Response.end rsp $ format 0 $ toJSON $ map toPlaceOrderEventDTO events
     pure ())
-    (\_ => pure ())
+    (\_ => do
+      putStrLn "Request has beed processed."
+      pure ())
     (\err => do
-      -- Response.end rsp $ "There was an error: " ++ show err
+      Response.statusCode rsp 500
+      Response.end rsp $ "{ \"error\":\"500\", \"message\": \"There was an error: " ++ show err ++ "\"}"
       putStrLn err)
   where
     orderTakingWorkflow : OrderForm -> Backend (List PlacedOrderEvent)

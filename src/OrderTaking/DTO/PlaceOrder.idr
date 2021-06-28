@@ -141,13 +141,6 @@ namespace DatabaseDTO
 -- Outgoing information
 -- To Downstream systems
 
--- public export
--- data PlacedOrderEvent
---   = OrderPlacedEvent         PricedOrder
---   | BillableOrderPlacedEvent BillableOrderPlaced
---   | AcknowledgementSentEvent OrderAcknowledgementSent
---   | InvalidOrderRegistered   InvalidOrder
-
 namespace DownstreamDTO
 
   public export
@@ -246,26 +239,76 @@ namespace DownstreamDTO
     | AcknowledgementSentEvent  OrderAcknowledgementSentDTO
     | InvalidOrderRegistered    InvalidOrderDTO
 
-  ToJSON CheckedAddressValidationErrorDTO where
-  FromJSON CheckedAddressValidationErrorDTO where
-  ToJSON AddressValidationErrorDTO where
-  FromJSON AddressValidationErrorDTO where
-  ToJSON ValidationErrorDTO where
-  FromJSON ValidationErrorDTO where
-  ToJSON PlaceOrderEventDTO where
-  FromJSON PlaceOrderEventDTO where
+  toJSONArg1 : {x : Type} -> (ToJSON x) => String -> x -> JSON
+  toJSONArg1 tag field = JObject [("tag", JString tag), ("arg1", toJSON field)]
 
-  %runElab deriveJSON defaultOpts `{{PricedOrderLineDsDTO}}
-  %runElab deriveJSON defaultOpts `{{PricedOrderDsDTO}}
-  %runElab deriveJSON defaultOpts `{{AddressDsDTO}}
-  %runElab deriveJSON defaultOpts `{{BillableOrderPlacedDTO}}
-  %runElab deriveJSON defaultOpts `{{OrderAcknowledgementSentDTO}}
-  -- %runElab deriveJSON defaultOpts `{{CheckedAddressValidationErrorDTO}}
-  -- %runElab deriveJSON defaultOpts `{{AddressValidationErrorDTO}}
+  fromJSONArg1 : (FromJSON x) => String -> (x -> y) -> JSON -> Maybe y
+  fromJSONArg1 tag create (JObject [("tag", JString tag0), ("arg1", field)])
+    = if tag == tag0
+        then map create $ fromJSON field
+        else Nothing
+  fromJSONArg1 _ _ _ = Nothing
+
+  ToJSON CheckedAddressValidationErrorDTO where
+    toJSON (InvalidFormat x)   = toJSONArg1 "InvalidFormat"   x
+    toJSON (AddressNotFound x) = toJSONArg1 "AddressNotFound" x
+  
+  FromJSON CheckedAddressValidationErrorDTO where
+    fromJSON x = fromJSONArg1 "InvalidFormat"   InvalidFormat x
+    fromJSON x = fromJSONArg1 "AddressNotFound" AddressNotFound x
+    fromJSON _ = Nothing
+
+  ToJSON AddressValidationErrorDTO where
+    toJSON (MkAddressLineError    x) = toJSONArg1 "MkAddressLineError"    x
+    toJSON (MkAddressOptLineError x) = toJSONArg1 "MkAddressOptLineError" x
+    toJSON (MkAddressCityError    x) = toJSONArg1 "MkAddressCityError"    x
+    toJSON (MkAddressZipCodeError x) = toJSONArg1 "MkAddressZipCodeError" x
+    toJSON (CheckedAddressError   x) = toJSONArg1 "CheckedAddressError"   x
+  
+  FromJSON AddressValidationErrorDTO where
+    fromJSON x = fromJSONArg1 "MkAddressLineError" MkAddressLineError x
+    fromJSON x = fromJSONArg1 "MkAddressOptLineError" MkAddressOptLineError x
+    fromJSON x = fromJSONArg1 "MkAddressCityError" MkAddressCityError x
+    fromJSON x = fromJSONArg1 "MkAddressZipCodeError" MkAddressZipCodeError x
+    fromJSON x = fromJSONArg1 "CheckedAddressError" CheckedAddressError x
+    fromJSON _ = Nothing
+
   %runElab deriveJSON defaultOpts `{{NameValidationErrorDTO}}
   %runElab deriveJSON defaultOpts `{{EmailValidationErrorDTO}}
   %runElab deriveJSON defaultOpts `{{QuantityValidationErrorDTO}}
-  -- %runElab deriveJSON defaultOpts `{{ValidationErrorDTO}}
+
+  ToJSON ValidationErrorDTO where
+    toJSON (AddressValidation   x) = toJSONArg1 "AddressValidation" x
+    toJSON (NameValidation      x) = toJSONArg1 "NameValidation" x
+    toJSON (EmailValidation     x) = toJSONArg1 "EmailValidation" x
+    toJSON (QuantityValidation  x) = toJSONArg1 "QuantityValidation" x
+
+  FromJSON ValidationErrorDTO where
+    fromJSON x = fromJSONArg1 "AddressValidation" AddressValidation x
+    fromJSON x = fromJSONArg1 "NameValidation" NameValidation x
+    fromJSON x = fromJSONArg1 "EmailValidation" EmailValidation x
+    fromJSON x = fromJSONArg1 "QuantityValidation" QuantityValidation x
+    fromJSON _ = Nothing
+
+  %runElab deriveJSON defaultOpts `{{PricedOrderLineDsDTO}}
+  %runElab deriveJSON defaultOpts `{{AddressDsDTO}}
+  %runElab deriveJSON defaultOpts `{{BillableOrderPlacedDTO}}
+  %runElab deriveJSON defaultOpts `{{OrderAcknowledgementSentDTO}}
   %runElab deriveJSON defaultOpts `{{ProductCodeErrDTO}}
   %runElab deriveJSON defaultOpts `{{InvalidOrderDTO}}
-  -- %runElab deriveJSON defaultOpts `{{PlaceOrderEventDTO}}
+  %runElab deriveJSON defaultOpts `{{PricedOrderDsDTO}}
+
+  export
+  ToJSON PlaceOrderEventDTO where
+    toJSON (OrderPlacedEvent          x) = toJSONArg1 "OrderPlacedEvent" x
+    toJSON (BillableOrderPlacedEvent  x) = toJSONArg1 "BillableOrderPlacedEvent" x
+    toJSON (AcknowledgementSentEvent  x) = toJSONArg1 "AcknowledgementSentEvent" x
+    toJSON (InvalidOrderRegistered    x) = toJSONArg1 "InvalidOrderRegistered" x
+
+  export
+  FromJSON PlaceOrderEventDTO where
+    fromJSON x = fromJSONArg1 "OrderPlacedEvent" OrderPlacedEvent x
+    fromJSON x = fromJSONArg1 "BillableOrderPlacedEvent" BillableOrderPlacedEvent x
+    fromJSON x = fromJSONArg1 "AcknowledgementSentEvent" AcknowledgementSentEvent x
+    fromJSON x = fromJSONArg1 "InvalidOrderRegistered" InvalidOrderRegistered x
+    fromJSON _ = Nothing

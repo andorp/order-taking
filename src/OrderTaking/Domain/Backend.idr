@@ -214,7 +214,7 @@ namespace ToDownstream
   toValidationErrorDTO (EmailValidation     x) = EmailValidation    (toEmailValidationErrorDTO x)
   toValidationErrorDTO (QuantityValidation  x) = QuantityValidation (toQuantityValidationErrorDTO x)
 
-  -- toProductCodeErrorDTO : ProductCodeErr -> ProductCodeErrDTO
+  toProductCodeErrorDTO (MkProductCodeErr x) = MkProductCodeErr x
 
   toInvalidOrderDTO io = MkInvalidOrderDTO
     { validationErrors = map toValidationErrorDTO io.validationErrors
