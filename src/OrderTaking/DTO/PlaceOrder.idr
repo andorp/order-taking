@@ -254,9 +254,9 @@ namespace DownstreamDTO
     toJSON (AddressNotFound x) = toJSONArg1 "AddressNotFound" x
   
   FromJSON CheckedAddressValidationErrorDTO where
-    fromJSON x = fromJSONArg1 "InvalidFormat"   InvalidFormat x
-    fromJSON x = fromJSONArg1 "AddressNotFound" AddressNotFound x
-    fromJSON _ = Nothing
+    fromJSON x
+        = fromJSONArg1 "InvalidFormat"   InvalidFormat x
+      <|> fromJSONArg1 "AddressNotFound" AddressNotFound x
 
   ToJSON AddressValidationErrorDTO where
     toJSON (MkAddressLineError    x) = toJSONArg1 "MkAddressLineError"    x
@@ -266,12 +266,12 @@ namespace DownstreamDTO
     toJSON (CheckedAddressError   x) = toJSONArg1 "CheckedAddressError"   x
   
   FromJSON AddressValidationErrorDTO where
-    fromJSON x = fromJSONArg1 "MkAddressLineError" MkAddressLineError x
-    fromJSON x = fromJSONArg1 "MkAddressOptLineError" MkAddressOptLineError x
-    fromJSON x = fromJSONArg1 "MkAddressCityError" MkAddressCityError x
-    fromJSON x = fromJSONArg1 "MkAddressZipCodeError" MkAddressZipCodeError x
-    fromJSON x = fromJSONArg1 "CheckedAddressError" CheckedAddressError x
-    fromJSON _ = Nothing
+    fromJSON x
+        = fromJSONArg1 "MkAddressLineError" MkAddressLineError x
+      <|> fromJSONArg1 "MkAddressOptLineError" MkAddressOptLineError x
+      <|> fromJSONArg1 "MkAddressCityError" MkAddressCityError x
+      <|> fromJSONArg1 "MkAddressZipCodeError" MkAddressZipCodeError x
+      <|> fromJSONArg1 "CheckedAddressError" CheckedAddressError x
 
   %runElab deriveJSON defaultOpts `{{NameValidationErrorDTO}}
   %runElab deriveJSON defaultOpts `{{EmailValidationErrorDTO}}
@@ -284,11 +284,11 @@ namespace DownstreamDTO
     toJSON (QuantityValidation  x) = toJSONArg1 "QuantityValidation" x
 
   FromJSON ValidationErrorDTO where
-    fromJSON x = fromJSONArg1 "AddressValidation" AddressValidation x
-    fromJSON x = fromJSONArg1 "NameValidation" NameValidation x
-    fromJSON x = fromJSONArg1 "EmailValidation" EmailValidation x
-    fromJSON x = fromJSONArg1 "QuantityValidation" QuantityValidation x
-    fromJSON _ = Nothing
+    fromJSON x
+        = fromJSONArg1 "AddressValidation" AddressValidation x
+      <|> fromJSONArg1 "NameValidation" NameValidation x
+      <|> fromJSONArg1 "EmailValidation" EmailValidation x
+      <|> fromJSONArg1 "QuantityValidation" QuantityValidation x
 
   %runElab deriveJSON defaultOpts `{{PricedOrderLineDsDTO}}
   %runElab deriveJSON defaultOpts `{{AddressDsDTO}}
@@ -307,8 +307,8 @@ namespace DownstreamDTO
 
   export
   FromJSON PlaceOrderEventDTO where
-    fromJSON x = fromJSONArg1 "OrderPlacedEvent" OrderPlacedEvent x
-    fromJSON x = fromJSONArg1 "BillableOrderPlacedEvent" BillableOrderPlacedEvent x
-    fromJSON x = fromJSONArg1 "AcknowledgementSentEvent" AcknowledgementSentEvent x
-    fromJSON x = fromJSONArg1 "InvalidOrderRegistered" InvalidOrderRegistered x
-    fromJSON _ = Nothing
+    fromJSON x
+        = fromJSONArg1 "OrderPlacedEvent" OrderPlacedEvent x
+      <|> fromJSONArg1 "BillableOrderPlacedEvent" BillableOrderPlacedEvent x
+      <|> fromJSONArg1 "AcknowledgementSentEvent" AcknowledgementSentEvent x
+      <|> fromJSONArg1 "InvalidOrderRegistered" InvalidOrderRegistered x

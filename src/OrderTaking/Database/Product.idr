@@ -50,6 +50,12 @@ throwIfFail mkError p = do
     | HasError err => throwError $ mkError !(toString err)
   pure ()
 
+throwIfFailE : (String -> ProductDBError) -> Promise (Either Error a) -> ProductDB a
+throwIfFailE mkError p = do
+  Right result <- lift (lift p)
+    | Left err => throwError $ mkError !(toString err)
+  pure result
+
 export
 saveProduct : ProductDTO -> ProductDB ()
 saveProduct (MkProductDTO (MkProductCodeDTO productCode) price description) = do
@@ -63,13 +69,21 @@ saveProduct (MkProductDTO (MkProductCodeDTO productCode) price description) = do
 
 export
 productExists : ProductCodeDTO -> ProductDB Bool
-productExists _ = pure False
--- TODO
+productExists (MkProductCodeDTO productCode) = do
+  db <- ask
+  row <- throwIfFailE NonExistingProduct
+       $ Database.get db "SELECT code, description, price FROM product WHERE code='\{productCode}';"
+  pure $ maybe False (const True) !(toNonEmpty row)
 
 export
 productPrice : ProductCodeDTO -> ProductDB Double
-productPrice _ = pure 1.0
--- TODO
+productPrice (MkProductCodeDTO productCode) = do
+  db <- ask
+  row0 <- throwIfFailE NonExistingProduct
+        $ Database.get db "SELECT code, description, price FROM product WHERE code='\{productCode}';"
+  Just row <- toNonEmpty row0
+    | Nothing => throwError $ NonExistingProduct $ show productCode
+  fieldDouble row "price"
 
 export
 initDB : IO ()
@@ -78,4 +92,9 @@ initDB = do
   resolve' (\_ => putStrLn "OK.") putStrLn $ do
     db <- either !(SQLite.database sqlite "./db/product.db")
     ignore $ Database.run db $ renderCommand $ CreateTable productTable
+    ignore $ Database.run db $ renderCommand $ Insert productTable
+      [ FieldOf "code"        (SQLText "g21")
+      , FieldOf "description" (SQLText "A fluffy gizmo toy")
+      , FieldOf "price"       (SQLDouble 24.00)
+      ]
     ignore $ Database.close db

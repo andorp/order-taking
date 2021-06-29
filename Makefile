@@ -17,9 +17,6 @@ watch:
 clean-lsp-log:
 	rm ~/.cache/nvim/lsp.log
 
-clean-db:
-	rm -r db
-
 clean:
 	$(idris2) --clean order-taking-service.ipkg
 	rm -r build
@@ -31,7 +28,18 @@ nodejs:
 	$(idris2) --clean order-taking-service.ipkg
 	$(idris2) --build order-taking-service.ipkg --codegen node
 
-start: init clean nodejs
+drop-db:
+	rm -r db
+
+init-db: init drop-db nodejs
+	mkdir db
+	touch db/product.db
+	touch db/order.db
+	rm service/order-taking-service.js
+	cp build/exec/order-taking-service service/order-taking-service.js
+	$(node) service/order-taking-service.js --init-db
+
+start: init nodejs
 	rm service/order-taking-service.js
 	cp build/exec/order-taking-service service/order-taking-service.js
 	$(node) service/order-taking-service.js

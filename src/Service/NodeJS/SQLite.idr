@@ -45,9 +45,9 @@ isNull : Error -> IO Bool
 isNull e = primIO (ffi_isNull e)
 
 ||| Checks if the error really occured
-occured : Error -> IO SomeError
+occured : HasIO io => Error -> io SomeError
 occured e = do
-  n <- isNull e
+  n <- liftIO $ isNull e
   pure $ if n then NoError else HasError e
 
 namespace Row
@@ -104,36 +104,47 @@ namespace Database
       mErr <- occured e
       ok mErr))
 
-  -- TODO: Bring it back when needed.
-  -- %foreign "node:lambda: (db,s,p) => (db.run(s,[p]))"
-  -- ffi_runWith1 : Database -> String -> String -> PrimIO ()
+  export
+  data GetRow : Type where [external]
 
-  -- export
-  -- runWith1 : Database -> Sql -> String -> IO ()
-  -- runWith1 db s p = primIO (ffi_runWith1 db s p)
-
-  %foreign "node:lambda: (db,s,c) => (db.get(s,c))"
-  ffi_get : Database -> String -> (Error -> Row -> PrimIO ()) -> PrimIO ()
+  %foreign "node:lambda: r => {if(r){return BigInt(0);}else{return BigInt(1);}}"
+  ffi_isEmptyRow : GetRow -> PrimIO Bool
 
   export
-  get : Database -> Sql -> Promise (Either Error Row)
+  isEmptyRow : HasIO io => GetRow -> io Bool
+  isEmptyRow r = primIO (ffi_isEmptyRow r)
+
+  export
+  data NonEmptyRow : Type where [external]
+
+  export
+  toNonEmpty : HasIO io => GetRow -> io (Maybe NonEmptyRow)
+  toNonEmpty r = if !(isEmptyRow r)
+    then pure Nothing
+    else pure $ Just $ believe_me r
+
+  %foreign "node:lambda: (u,r,f) => r[f]"
+  ffi_field : NonEmptyRow -> String -> PrimIO a
+
+  export
+  fieldStr : HasIO io => NonEmptyRow -> String -> io String
+  fieldStr row name = primIO (ffi_field row name)
+
+  export
+  fieldDouble : HasIO io => NonEmptyRow -> String -> io Double
+  fieldDouble row name = primIO (ffi_field row name)
+
+  %foreign "node:lambda: (db,s,c) => (db.get(s,(e,r) => c(e)(r)()))"
+  ffi_get : Database -> String -> (Error -> GetRow -> PrimIO ()) -> PrimIO ()
+
+  export
+  get : Database -> Sql -> Promise (Either Error GetRow)
   get db sql = promisify $ \ok, err => ffi_get db sql $ \e, row => toPrim $ do
+    putStrLn sql
     mErr <- occured e
     case mErr of
       NoError     => ok $ Right row
       HasError e2 => ok $ Left e2
-
-  -- TODO: Uncomment when we need this.
-  -- %foreign "node:lambda: (db,s,row,comp) => (db.each(s, (e,r) => (row(e)(r)()), (e,c) => (comp(e)()) ))"
-  -- ffi_each
-  --   : Database -> String -> (Error -> Row -> PrimIO ()) -> (Error -> PrimIO ()) -> PrimIO ()
-
-  -- export
-  -- each : Database -> Sql -> (Error -> Row -> IO ()) -> (Error -> IO ()) -> IO ()
-  -- each db s onRow onComplete
-  --   = primIO
-  --   $ ffi_each db s (\e,r => toPrim $ onRow e r)
-  --                   (\e   => toPrim $ onComplete e)
 
 namespace SQLite
 
@@ -157,4 +168,3 @@ namespace SQLite
       if !(isNull e)
         then pure ()
         else (ok (Left e)))))
-
