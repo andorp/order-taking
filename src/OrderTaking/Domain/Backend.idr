@@ -137,6 +137,7 @@ namespace ToDatabase
 namespace ToDownstream
 
   export toPlaceOrderEventDTO   : PlacedOrderEvent -> PlaceOrderEventDTO
+  export toPlacedOrderErrorDTO  : PlaceOrderError -> PlaceOrderErrorDTO
 
   toPricedOrderDsDTO            : PricedOrder -> PricedOrderDsDTO
   toPricedOrderLineDsDTO        : PricedOrderLine -> PricedOrderLineDsDTO
@@ -150,6 +151,8 @@ namespace ToDownstream
   toValidationErrorDTO          : ValidationError -> ValidationErrorDTO
   toProductCodeErrorDTO         : ProductCodeErr -> ProductCodeErrDTO
   toInvalidOrderDTO             : InvalidOrder -> InvalidOrderDTO
+  toPricingErrorDTO             : PricingError -> PricingErrorDTO
+  toRemoteServiceErrorDTO       : RemoteServiceError -> RemoteServiceErrorDTO
 
   toPlaceOrderEventDTO (OrderPlacedEvent         x) = OrderPlacedEvent          (toPricedOrderDsDTO x)
   toPlaceOrderEventDTO (BillableOrderPlacedEvent x) = BillableOrderPlacedEvent  (toBillableOrderPlacedDTO x)
@@ -220,6 +223,17 @@ namespace ToDownstream
     { validationErrors = map toValidationErrorDTO io.validationErrors
     , productCodeErrors = map toProductCodeErrorDTO io.productCodeErrors
     }
+
+  toPricingErrorDTO (MkPricingError message) = MkPricingError message
+  
+  toRemoteServiceErrorDTO (MkRemoteServiceError (MkServiceInfo name endpoint) (MkException message))
+    = MkRemoteServiceErrorDTO name message
+
+  toPlacedOrderErrorDTO (MkPlaceOrderError x) = MkPlaceOrderError x
+  toPlacedOrderErrorDTO (ValidationErrors xs) = ValidationErrors  $ map toValidationErrorDTO xs
+  toPlacedOrderErrorDTO (ProductCodeError x)  = ProductCodeError  $ toProductCodeErrorDTO x
+  toPlacedOrderErrorDTO (PriceOrderError x)   = PriceOrderError   $ toPricingErrorDTO x
+  toPlacedOrderErrorDTO (RemoteServiceErr x)  = RemoteServiceErr  $ toRemoteServiceErrorDTO x
 
 -- namespace WriteModel
 

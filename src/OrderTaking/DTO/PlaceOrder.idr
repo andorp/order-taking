@@ -239,6 +239,25 @@ namespace DownstreamDTO
     | AcknowledgementSentEvent  OrderAcknowledgementSentDTO
     | InvalidOrderRegistered    InvalidOrderDTO
 
+  public export
+  record PricingErrorDTO where
+    constructor MkPricingError
+    message : String
+
+  public export
+  record RemoteServiceErrorDTO where
+    constructor MkRemoteServiceErrorDTO
+    serviceInfo : String
+    exception   : String
+
+  public export
+  data PlaceOrderErrorDTO
+    = MkPlaceOrderError String
+    | ValidationErrors (List ValidationErrorDTO)
+    | ProductCodeError ProductCodeErrDTO
+    | PriceOrderError PricingErrorDTO
+    | RemoteServiceErr RemoteServiceErrorDTO
+
   toJSONArg1 : {x : Type} -> (ToJSON x) => String -> x -> JSON
   toJSONArg1 tag field = JObject [("tag", JString tag), ("arg1", toJSON field)]
 
@@ -297,6 +316,8 @@ namespace DownstreamDTO
   %runElab deriveJSON defaultOpts `{{ProductCodeErrDTO}}
   %runElab deriveJSON defaultOpts `{{InvalidOrderDTO}}
   %runElab deriveJSON defaultOpts `{{PricedOrderDsDTO}}
+  %runElab deriveJSON defaultOpts `{{PricingErrorDTO}}
+  %runElab deriveJSON defaultOpts `{{RemoteServiceErrorDTO}}
 
   export
   ToJSON PlaceOrderEventDTO where
@@ -312,3 +333,20 @@ namespace DownstreamDTO
       <|> fromJSONArg1 "BillableOrderPlacedEvent" BillableOrderPlacedEvent x
       <|> fromJSONArg1 "AcknowledgementSentEvent" AcknowledgementSentEvent x
       <|> fromJSONArg1 "InvalidOrderRegistered" InvalidOrderRegistered x
+
+  export
+  ToJSON PlaceOrderErrorDTO where
+    toJSON (MkPlaceOrderError x)  = toJSONArg1 "MkPlaceOrderError" x
+    toJSON (ValidationErrors xs)  = toJSONArg1 "ValidationErrors" xs
+    toJSON (ProductCodeError x)   = toJSONArg1 "ProductCodeError" x
+    toJSON (PriceOrderError x)    = toJSONArg1 "PriceOrderError" x
+    toJSON (RemoteServiceErr x)   = toJSONArg1 "RemoteServiceErr" x
+
+  export
+  FromJSON PlaceOrderErrorDTO where
+    fromJSON x
+        = fromJSONArg1 "MkPlaceOrderError" MkPlaceOrderError x
+      <|> fromJSONArg1 "ValidationErrors" ValidationErrors x
+      <|> fromJSONArg1 "ProductCodeError" ProductCodeError x
+      <|> fromJSONArg1 "PriceOrderError" PriceOrderError x      
+      <|> fromJSONArg1 "RemoteServiceErr" RemoteServiceErr x

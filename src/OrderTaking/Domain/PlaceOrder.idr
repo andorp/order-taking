@@ -385,24 +385,31 @@ createBillingEvent pricedOrder = do
      else Nothing
 
 public export
-data PricingError = MkPricingError String
+record PricingError where
+  constructor MkPricingError
+  message : String
 
 public export
 data AckSent = Sent | NotSent
 
 data Uri = MkUri String
 
+public export
 record ServiceInfo where
   constructor MkServiceInfo
   name     : String
   endpoint : Uri
 
-data Exception = MkException String
+public export
+record RemoteServiceException where
+  constructor MkException
+  message : String
 
+public export
 record RemoteServiceError where
   constructor MkRemoteServiceError
   serviceInfo : ServiceInfo
-  exception : Exception
+  exception   : RemoteServiceException
 
 public export
 data PlaceOrderError

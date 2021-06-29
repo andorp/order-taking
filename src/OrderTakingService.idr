@@ -43,7 +43,10 @@ orderTaking rb req rsp = do
       Left err => do
         putStrLn "There was an error: \{show err}"
         Response.statusCode rsp 400
-        Response.end rsp $ "{ \"error\":\"400\", \"message\": \"There was an error: " ++ show err ++ "\"}"
+        Response.end rsp $ format 0 $ JObject
+          [ ("message", JString "There was an placed order error.")
+          , ("order-event-error", toJSON (toPlacedOrderErrorDTO err))
+          ]
       Right events => do
         putStrLn $ show events
         Response.statusCode rsp 200
@@ -53,9 +56,12 @@ orderTaking rb req rsp = do
       putStrLn "Request has beed processed."
       pure ())
     (\err => do
+      putStrLn "Error occured during promise execution: \{err}"
       Response.statusCode rsp 500
-      Response.end rsp $ "{ \"error\":\"500\", \"message\": \"There was an error: " ++ show err ++ "\"}"
-      putStrLn err)
+      Response.end rsp $ format 0 $ JObject
+        [ ("message", JString "There was an execution error.")
+        , ("promise-error", JString err)
+        ])
   where
     orderTakingWorkflow : OrderForm -> Backend (List PlacedOrderEvent)
     orderTakingWorkflow orderForm = interpret backend $ morph withPOMMapping PlaceOrder.workflow $ orderForm
