@@ -10,6 +10,7 @@ import OrderTaking.Database.Order
 import OrderTaking.Database.Product
 import OrderTaking.Domain.Backend
 import OrderTaking.DTO.PlaceOrder
+import OrderTaking.Context
 
 import Rango.BoundedContext.Workflow
 import Rango.DataTransfer.JSON.Interfaces
@@ -20,6 +21,49 @@ import Service.NodeJS.MD5
 import Service.NodeJS.Date
 import Service.NodeJS.Promise
 
+import Rango.BoundedContext.BoundedContext
+
+
+
+handleCommand : BoundedContextCommand -> Promise (Either BoundedContextError BoundedContextEvent)
+handleCommand = handle testBCM
+
+boundedContext : Request -> Response -> IO ()
+boundedContext req rsp = resolve' (\_ => pure ()) (\err => pure ()) $ do
+  content <- Request.body req
+  putStrLn content
+  Response.setHeader rsp "Content-Type" "application/json"
+  Response.setHeader rsp "Access-Control-Allow-Origin" "*"
+  let Just jsValue = JSON.parse content
+      | Nothing => do
+          putStrLn "Couldn't parse incoming JSON."
+          Response.statusCode rsp 400
+          Response.end rsp "{\"message\":\"Couldn't parse incoming JSON.\"}"
+  Just cmd <- case Request.url req of
+                "/place-order" => do
+                  let Just orderFormDTO = the (Maybe OrderFormDTO) (fromJSON jsValue)
+                      | Nothing => do
+                          putStrLn "Couldn't parse JSValue."
+                          Response.statusCode rsp 400
+                          Response.end rsp "{\"message\":\"Couldn't parse DTO JSON.\"}"
+                          pure Nothing
+                  pure $ Just $ PlaceOrderCmd $ FromUpstream.orderForm orderFormDTO
+                _  => do
+                  Response.statusCode rsp 400
+                  Response.end rsp "{\"message\":\"Unknown API endpoint.\"}"
+                  pure Nothing
+    | Nothing => pure ()
+  result <- handleCommand cmd
+  case result of
+    Left err => do
+      Response.statusCode rsp 400
+      Response.end rsp $ format 0 $ JObject
+        [ ("message", JString "There was a placed order error.")
+        , ("order-event-error", toJSON (toDTO err))
+        ]
+    Right res => do
+      Response.statusCode rsp 200
+      Response.end rsp $ format 0 $ toJSON $ toDTO res
 
 orderTaking : RunBackend -> Request -> Response -> IO ()
 orderTaking rb req rsp = do
@@ -81,8 +125,10 @@ dispatcher runBackend req rsp = do
 startService : IO ()
 startService = do
   putStrLn "Staring Order taking service."
-  let orderDBComp = orderDBSQLite
-  let productDBComp = productDBSQlite
+  let orderDBComp       = orderDBSQLite
+  let productDBComp     = productDBSQlite
+  let emailComp         = noEmail
+  let checkAddressComp  = okCheckAddress
   run <- mkRunBackend
   http   <- HTTP.require
   server <- HTTP.createServer http (dispatcher run)

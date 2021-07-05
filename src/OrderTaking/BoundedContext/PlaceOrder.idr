@@ -5,6 +5,7 @@ import OrderTaking.Domain.PlaceOrder
 
 %default total
 
+export
 data PlaceOrderData
   = OrderForm
   | ValidatedOrder
@@ -14,9 +15,11 @@ data PlaceOrderData
   | InvalidOrderQueued
   | Finished
 
+export
 data Check : PlaceOrderData -> PlaceOrderData -> PlaceOrderData -> Type where
   CheckInvalidOrder : Check ValidatedOrder InvalidOrder Order
 
+export
 data Transition : PlaceOrderData -> PlaceOrderData -> Type where
   ValidateOrder     : Transition OrderForm           ValidatedOrder
   AddInvalidOrder   : Transition InvalidOrder        InvalidOrderQueued

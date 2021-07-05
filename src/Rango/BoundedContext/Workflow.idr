@@ -25,6 +25,9 @@ data Workflow
       -> Workflow cmd chk mid post
       -> Workflow cmd chk pre post
 
+||| How to turn the pieces in the Workflow description into regular
+||| Idris Types. This helps us to connect the high level description
+||| with the actual implementation.
 public export
 record Morphism
         state
@@ -42,6 +45,10 @@ record Morphism
       -> chk s b1 b2
       -> (StateType s) -> m (Either (StateType b1) (StateType b2))
 
+||| How to turn a Workflow description into a state transition system
+||| which can is represented as a Kliesli arrow of a Monad; a -> m b
+||| This helps us to connect the high level description
+||| with the actual implementation.
 export
 morph
   :  Functor m

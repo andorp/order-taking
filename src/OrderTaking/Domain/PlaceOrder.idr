@@ -328,8 +328,14 @@ Show ValidationError where
 public export
 data CheckedAddress = MkCheckedAddress AddressForm
 
-public export
-data HtmlString = MkHtmlString String
+namespace HtmlString
+
+  public export
+  data HtmlString = MkHtmlString String
+
+  export
+  value : HtmlString -> String
+  value (MkHtmlString x) = x
 
 public export
 record OrderAcknowledgement where
@@ -392,7 +398,10 @@ record PricingError where
 public export
 data AckSent = Sent | NotSent
 
-data Uri = MkUri String
+public export
+record Uri where
+  constructor MkUri
+  address : String
 
 public export
 record ServiceInfo where
@@ -402,7 +411,7 @@ record ServiceInfo where
 
 public export
 record RemoteServiceException where
-  constructor MkException
+  constructor MkRemoteServiceException
   message : String
 
 public export

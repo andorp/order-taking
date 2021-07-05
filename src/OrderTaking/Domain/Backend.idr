@@ -226,7 +226,7 @@ namespace ToDownstream
 
   toPricingErrorDTO (MkPricingError message) = MkPricingError message
   
-  toRemoteServiceErrorDTO (MkRemoteServiceError (MkServiceInfo name endpoint) (MkException message))
+  toRemoteServiceErrorDTO (MkRemoteServiceError (MkServiceInfo name endpoint) (MkRemoteServiceException message))
     = MkRemoteServiceErrorDTO name message
 
   toPlacedOrderErrorDTO (MkPlaceOrderError x) = MkPlaceOrderError x
@@ -245,8 +245,15 @@ namespace ToDownstream
 --   record Customer where
 --     constructor MkCustomer
 
-record OrderDB where
-  constructor MkOrderDB
+{-
+* If the inner type is an DDD Entity, with its own identity, it should be
+stored in a separate table.
+* If the inner type is a DDD Value Object, without its own identity, it should
+be stored “inline” with the parent data.
+-}
+
+record OrderDBComp where
+  constructor MkOrderDBComp
   dbConnection        : Type 
   dbError             : Type
   showDBError         : dbError -> String
@@ -258,30 +265,6 @@ record OrderDB where
   saveOrder           : dbConnection -> PricedOrderDTO -> Promise (Maybe dbError)
   -- saveCustomer : dbConnection -> WriteModel.Cusomter -> Promise (Maybe dbError)
   -- loadCusomter : dbConnection -> Promise (Either dbError ReadModel.Customer)
-
-{-
-* If the inner type is an DDD Entity, with its own identity, it should be
-stored in a separate table.
-* If the inner type is a DDD Value Object, without its own identity, it should
-be stored “inline” with the parent data.
--}
-
-
-export
-orderDBSQLite : OrderDB
-orderDBSQLite = MkOrderDB
-  { dbConnection        = Database
-  , dbError             = OrderDBError
-  , showDBError         = show
-  , initConnection      = do
-      sqlite <- SQLite.require
-      map (mapFst (InitializeError . show)) $ SQLite.database sqlite "./db/order.db"
-  , closeConnection     = \db => Nothing <$ SQLite.Database.close db
-  , beginTransaction    = \db => map (map (InitializeError . show) . toMaybe) $ SQLite.Database.run db "begin"
-  , commitTransaction   = \db => map (map (InitializeError . show) . toMaybe) $ SQLite.Database.run db "commit"
-  , rollbackTransaction = \db => map (map (InitializeError . show) . toMaybe) $ SQLite.Database.run db "rollback"
-  , saveOrder           = \db, po => map (either Just (const Nothing)) $ runOrderDB db $ Order.saveOrder po
-  }
 
 record ProductDBComp where
   constructor MkProductDBComp
@@ -296,37 +279,42 @@ record ProductDBComp where
   productPrice        : dbConnection -> ProductCodeDTO -> Promise (Either dbError Double)
   productExists       : dbConnection -> ProductCodeDTO -> Promise (Either dbError Bool)
 
-export
-productDBSQlite : ProductDBComp
-productDBSQlite = MkProductDBComp
-  { dbConnection        = Database
-  , dbError             = ProductDBError
-  , showDBError         = show
-  , initConnection      = do
-      sqlite <- SQLite.require
-      map (mapFst (InitializeError . show)) $ SQLite.database sqlite "./db/product.db"
-  , closeConnection     = \db => Nothing <$ SQLite.Database.close db
-  , beginTransaction    = \db => map (map (InitializeError . show) . toMaybe) $ SQLite.Database.run db "begin"
-  , commitTransaction   = \db => map (map (InitializeError . show) . toMaybe) $ SQLite.Database.run db "commit"
-  , rollbackTransaction = \db => map (map (InitializeError . show) . toMaybe) $ SQLite.Database.run db "rollback"
-  , productPrice        = \db, pc => runProductDB db $ Product.productPrice  pc
-  , productExists       = \db, pc => runProductDB db $ Product.productExists pc
-  }
+record EmailComp where
+  constructor MkEmailComp
+  emailError  : Type
+  showError   : emailError -> String
+  serviceInfo : ServiceInfo
+  send        : EmailAddress -> HtmlString -> Promise (Maybe emailError)
+
+data CheckAddressResult
+  = ValidAddress
+  | NotFound String
+  | InvalidAddress String
+
+record CheckAddressComp where
+  constructor MkCheckAddressComp
+  addressError : Type
+  showError    : addressError -> String
+  serviceInfo  : ServiceInfo
+  checkAddress : AddressForm -> Promise (Either addressError CheckAddressResult)
 
 record Dependencies where
   constructor MkDependencies
-  md5Provider   : MD5
-  orderDBComp   : OrderDB
-  orderDBConn   : orderDBComp.dbConnection
-  productDBComp : ProductDBComp
-  productDBConn : productDBComp.dbConnection
+  md5Provider       : MD5
+  orderDBComp       : OrderDBComp
+  orderDBConn       : orderDBComp.dbConnection
+  productDBComp     : ProductDBComp
+  productDBConn     : productDBComp.dbConnection
+  emailComp         : EmailComp
+  checkAddressComp  : CheckAddressComp
 
-orderDBDep : Dependencies -> (o : OrderDB ** o.dbConnection)
+orderDBDep : Dependencies -> (o : OrderDBComp ** o.dbConnection)
 orderDBDep d = (d.orderDBComp ** d.orderDBConn)
 
 productDBDep : Dependencies -> (p : ProductDBComp ** p.dbConnection)
 productDBDep d = (d.productDBComp ** d.productDBConn) 
 
+||| Backend monad for the PlaceOrder workflow.
 public export
 data Backend : Type -> Type where
   MkBackend : EitherT PlaceOrderError (ReaderT Dependencies Promise) a -> Backend a
@@ -375,9 +363,12 @@ runBackend {a} (MkRunBackend r) = r a
 
 export
 mkRunBackend
-  :  (orderDBComp   : OrderDB)
-  => (productDBComp : ProductDBComp)
-  => IO RunBackend
+  :  (orderDBComp       : OrderDBComp)
+  => (productDBComp     : ProductDBComp)
+  => (emailComp         : EmailComp)
+  => (checkAddressComp  : CheckAddressComp)
+  => HasIO io
+  => io RunBackend
 mkRunBackend = do
   sqlite <- SQLite.require
   md5    <- MD5.require
@@ -385,8 +376,8 @@ mkRunBackend = do
     -- Open DB conenctions
     orderDBConn
       <- Promise.either
-          $ mapFst (OrderDB.showDBError orderDBComp)
-          $ !(OrderDB.initConnection orderDBComp)
+          $ mapFst (OrderDBComp.showDBError orderDBComp)
+          $ !(OrderDBComp.initConnection orderDBComp)
     productDBConn
       <- Promise.either
           $ mapFst (ProductDBComp.showDBError productDBComp)
@@ -399,8 +390,17 @@ mkRunBackend = do
       | Just err => Promise.reject $ productDBComp.showDBError err
 
     -- Run the backend computation
-    let conn = MkDependencies md5 orderDBComp orderDBConn productDBComp productDBConn
-    x <- runReaderT conn (runEitherT (backend script))
+    let dependencies =
+          MkDependencies
+            { md5Provider       = md5
+            , orderDBComp       = orderDBComp
+            , orderDBConn       = orderDBConn
+            , productDBComp     = productDBComp
+            , productDBConn     = productDBConn
+            , emailComp         = emailComp
+            , checkAddressComp  = checkAddressComp
+            }
+    x <- runReaderT dependencies (runEitherT (backend script))
     case x of
       Left _ => do
         ignore $ orderDBComp.rollbackTransaction orderDBConn
@@ -414,15 +414,15 @@ mkRunBackend = do
     ignore $ orderDBComp.closeConnection orderDBConn
     pure (the (Either PlaceOrderError type) x)
 
-generateIdentifier : HasIO io => MD5 -> io String
-generateIdentifier md5 = do
-  n <- Date.now
-  d <- Random.double
-  idx <- MD5.create md5 (show n ++ show d)
-  putStrLn idx
-  pure idx
-
 namespace Model
+
+  generateIdentifier : HasIO io => MD5 -> io String
+  generateIdentifier md5 = do
+    n <- Date.now
+    d <- Random.double
+    idx <- MD5.create md5 (show n ++ show d)
+    putStrLn idx
+    pure idx
 
   newOrderId : Backend OrderId
   newOrderId = MkOrderId <$> (generateIdentifier !(asks md5Provider))
@@ -439,8 +439,17 @@ namespace Model
   
   checkAddressExists : AddressForm -> Backend (Either CheckedAddressValidationError CheckedAddress)
   checkAddressExists addressForm = do
-    -- TODO: Address checker
-    pure (Right (MkCheckedAddress addressForm))
+    comp <- asks checkAddressComp
+    Right res <- liftPromise $ comp.checkAddress addressForm
+      | Left err => throwError
+                  $ RemoteServiceErr
+                  $ MkRemoteServiceError comp.serviceInfo
+                  $ MkRemoteServiceException
+                  $ comp.showError err
+    pure $ case res of
+      ValidAddress        => Right (MkCheckedAddress addressForm)
+      NotFound msg        => Left (AddressNotFound msg)
+      InvalidAddress msg  => Left (InvalidFormat msg)
 
   getProductPrice : ProductCode -> Backend Price
   getProductPrice p = do
@@ -465,7 +474,13 @@ namespace Model
 
   sendOrderAcknowledgement : OrderAcknowledgement -> Backend AckSent
   sendOrderAcknowledgement orderAcknowledgement = do
-    -- TODO: Email sent...
+    comp <- asks emailComp
+    Nothing <- liftPromise $ comp.send orderAcknowledgement.emailAddress orderAcknowledgement.letter
+      | Just err => throwError
+                  $ RemoteServiceErr
+                  $ MkRemoteServiceError comp.serviceInfo
+                  $ MkRemoteServiceException
+                  $ comp.showError err
     pure Sent
 
   export
@@ -481,4 +496,59 @@ namespace Model
     , placePricedOrder                 = placePricedOrder
     , createOrderAcknowledgementLetter = createOrderAcknowledgementLetter
     , sendOrderAcknowledgement         = sendOrderAcknowledgement
+    }
+
+namespace Components
+
+  export
+  productDBSQlite : ProductDBComp
+  productDBSQlite = MkProductDBComp
+    { dbConnection        = Database
+    , dbError             = ProductDBError
+    , showDBError         = show
+    , initConnection      = do
+        sqlite <- SQLite.require
+        map (mapFst (InitializeError . show)) $ SQLite.database sqlite "./db/product.db"
+    , closeConnection     = \db => Nothing <$ SQLite.Database.close db
+    , beginTransaction    = \db => map (map (InitializeError . show) . toMaybe) $ SQLite.Database.run db "begin"
+    , commitTransaction   = \db => map (map (InitializeError . show) . toMaybe) $ SQLite.Database.run db "commit"
+    , rollbackTransaction = \db => map (map (InitializeError . show) . toMaybe) $ SQLite.Database.run db "rollback"
+    , productPrice        = \db, pc => runProductDB db $ Product.productPrice  pc
+    , productExists       = \db, pc => runProductDB db $ Product.productExists pc
+    }
+
+  export
+  orderDBSQLite : OrderDBComp
+  orderDBSQLite = MkOrderDBComp
+    { dbConnection        = Database
+    , dbError             = OrderDBError
+    , showDBError         = show
+    , initConnection      = do
+        sqlite <- SQLite.require
+        map (mapFst (InitializeError . show)) $ SQLite.database sqlite "./db/order.db"
+    , closeConnection     = \db => Nothing <$ SQLite.Database.close db
+    , beginTransaction    = \db => map (map (InitializeError . show) . toMaybe) $ SQLite.Database.run db "begin"
+    , commitTransaction   = \db => map (map (InitializeError . show) . toMaybe) $ SQLite.Database.run db "commit"
+    , rollbackTransaction = \db => map (map (InitializeError . show) . toMaybe) $ SQLite.Database.run db "rollback"
+    , saveOrder           = \db, po => map (either Just (const Nothing)) $ runOrderDB db $ Order.saveOrder po
+    }
+
+  export
+  noEmail : EmailComp
+  noEmail = MkEmailComp
+    { emailError  = String
+    , showError   = id
+    , serviceInfo = MkServiceInfo "NoOp Email" (MkUri "localhost")
+    , send = \addr, html => do
+        putStrLn "\{value addr} : \{value html}"
+        pure Nothing
+    }
+
+  export
+  okCheckAddress : CheckAddressComp
+  okCheckAddress = MkCheckAddressComp
+    { addressError = String
+    , showError    = id
+    , serviceInfo  = MkServiceInfo "NoOp Address Check" (MkUri "localhost")
+    , checkAddress = \_ => pure $ Right ValidAddress
     }
