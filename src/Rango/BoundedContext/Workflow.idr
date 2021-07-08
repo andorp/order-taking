@@ -31,7 +31,7 @@ data Workflow
 public export
 record Morphism
         state
-        (0 m : Type -> Type)
+        (0 m : Type -> Type) -- TODO: Move this to the first parameter
         (0 cmd : state -> state -> Type)
         (0 chk : state -> state -> state -> Type)
   where
