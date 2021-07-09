@@ -1,7 +1,6 @@
 module BoundedContext.OrderTaking.Workflow.PlaceOrder.DTO
 
 import Rango.DataTransfer.JSON.Derive
-import Rango.DataTransfer.SQL.Derive
 
 %language ElabReflection
 %default total
