@@ -14,7 +14,12 @@
   let order = {};
 
   async function submitOrder() {
-    let data = await postData('http://localhost:3000/', order);
+    let command = {
+      "tag": "PlaceOrderCmdDTO",
+      "value": order
+    };
+    let data = await postData('http://localhost:3000/order-taking', command);
+    console.log('submitOrder response: ' + JSON.stringify(data));
   }
 
   // function submitOrder() {

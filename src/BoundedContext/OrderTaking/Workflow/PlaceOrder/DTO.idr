@@ -176,11 +176,11 @@ namespace DownstreamDTO
 
   export
   constructorToJSON : {x : Type} -> (ToJSON x) => String -> x -> JSON
-  constructorToJSON tag field = JObject [("tag", JString tag), ("arg1", toJSON field)]
+  constructorToJSON tag field = JObject [("tag", JString tag), ("value", toJSON field)]
 
   export
   constructorFromJSON : (FromJSON x) => String -> (x -> y) -> JSON -> Maybe y
-  constructorFromJSON tag create (JObject [("tag", JString tag0), ("arg1", field)])
+  constructorFromJSON tag create (JObject [("tag", JString tag0), ("value", field)])
     = if tag == tag0
         then map create $ fromJSON field
         else Nothing
