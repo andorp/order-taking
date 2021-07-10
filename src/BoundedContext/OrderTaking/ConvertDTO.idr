@@ -7,7 +7,7 @@ import BoundedContext.OrderTaking.Event
 
 import BoundedContext.OrderTaking.Workflow.PlaceOrder.Domain
 import BoundedContext.OrderTaking.Workflow.PlaceOrder.DTO
-import BoundedContext.OrderTaking.Workflow.PlaceOrder.Backend
+import BoundedContext.OrderTaking.Workflow.PlaceOrder.ConvertDTO
 
 export
 toErrorDTO : Error.OrderTaking -> ErrorDTO
