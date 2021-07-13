@@ -72,7 +72,8 @@ productExists : ProductCodeDTO -> ProductDB Bool
 productExists (MkProductCodeDTO productCode) = do
   db <- ask
   row <- throwIfFailE NonExistingProduct
-       $ Database.get db "SELECT code, description, price FROM product WHERE code='\{productCode}';"
+       $ Database.get db $ renderCommand
+       $ Select ["code", "description", "price"] productTable [("code", "=", "'\{productCode}'")]
   pure $ maybe False (const True) !(toNonEmpty row)
 
 export
@@ -80,7 +81,9 @@ productPrice : ProductCodeDTO -> ProductDB Double
 productPrice (MkProductCodeDTO productCode) = do
   db <- ask
   row0 <- throwIfFailE NonExistingProduct
-        $ Database.get db "SELECT code, description, price FROM product WHERE code='\{productCode}';"
+        $ Database.get db
+        $ renderCommand
+        $ Select ["code", "description", "price"] productTable [("code", "=", "'\{productCode}'")]
   Just row <- toNonEmpty row0
     | Nothing => throwError $ NonExistingProduct $ show productCode
   fieldDouble row "price"

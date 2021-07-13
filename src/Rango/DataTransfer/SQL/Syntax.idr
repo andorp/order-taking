@@ -103,6 +103,23 @@ InsertValues (f@(MkField name sqlType primaryKey False notNull) :: fs) = FieldOf
 InsertValues (f@(MkField name sqlType primaryKey True  notNull) :: fs) = InsertValues fs -- Do not ask for auto fields
 
 public export
+data FieldDefinedInTable : (field : FieldName) -> (fields : List Field) -> Type where
+  Here  : FieldDefinedInTable f (MkField f _ _ _ _ :: fs)
+  There : FieldDefinedInTable f fs -> FieldDefinedInTable f (g :: fs)
+
+namespace FieldsExsistenceCheck
+  public export
+  data SelectedFieldsDefinedInTable : (names : List FieldName) -> (fields : List Field) -> Type where
+    Nil  : SelectedFieldsDefinedInTable [] fields
+    (::) : FieldDefinedInTable f fields -> SelectedFieldsDefinedInTable fs fields -> SelectedFieldsDefinedInTable (f :: fs) fields
+
+namespace FilterExsistenceCheck
+  public export
+  data FilteredFieldsDefinedInTable : (filters : List (FieldName, String, String)) -> (fields : List Field) -> Type where
+    Nil  : FilteredFieldsDefinedInTable [] fields
+    (::) : FieldDefinedInTable f fields -> FilteredFieldsDefinedInTable fs fields -> FilteredFieldsDefinedInTable ((f, _, _) :: fs) fields
+
+public export
 data Command : Type where
   CreateTable
     :  (table : Table)
@@ -111,6 +128,13 @@ data Command : Type where
     :  (table : Table)
     -> (values : HList (InsertValues table.fields))
     -> Command
+  Select
+    :  (  fields    : List FieldName)
+    -> (  table     : Table)
+    -> (0 okFields  : SelectedFieldsDefinedInTable fields table.fields)
+    => (  filters   : List (FieldName, String, String))
+    -> (0 okFilters : FilteredFieldsDefinedInTable filters table.fields)
+    => Command
 
 withCommas : List String -> String
 withCommas xs = concat (intersperse ", " xs)
@@ -169,3 +193,9 @@ renderCommand (CreateTable table)
   = "CREATE TABLE \{table.name} (\{withCommas (map renderCreateField table.fields ++ map renderConstraint table.constraints)})"
 renderCommand (Insert table values)
   = "INSERT INTO \{table.name} (\{withCommas (renderInsertNames table.fields)}) VALUES (\{withCommas (renderInsertValues values)})"
+renderCommand (Select fields table filters)
+  = "SELECT \{withCommas fields} FROM \{table.name}" ++
+    (case filters of
+      [] => ""
+      fs => " WHERE " ++ (withCommas $ map (\(field, op, cond) => "(\{field} \{op} \{cond})") fs)) ++
+    ";"
