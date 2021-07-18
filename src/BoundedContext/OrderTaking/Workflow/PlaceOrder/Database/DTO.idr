@@ -76,11 +76,11 @@ record ProductDTO where
   price       : Double
   description : String
 
-%runElab deriveJSON defaultOpts `{{AddressDTO}}
-%runElab deriveJSON defaultOpts `{{OrderLineDTO}}
-%runElab deriveJSON defaultOpts `{{PricedOrderLineDTO}}
-%runElab deriveJSON defaultOpts `{{CustomerDTO}}
-%runElab deriveJSON defaultOpts `{{OrderDTO}}
-%runElab deriveJSON defaultOpts `{{PricedOrderDTO}}
-%runElab deriveJSON defaultOpts `{{ProductCodeDTO}}
-%runElab deriveJSON defaultOpts `{{ProductDTO}}
+%runElab deriveJSON defaultOpts `{AddressDTO}
+%runElab deriveJSON defaultOpts `{OrderLineDTO}
+%runElab deriveJSON defaultOpts `{PricedOrderLineDTO}
+%runElab deriveJSON defaultOpts `{CustomerDTO}
+%runElab deriveJSON defaultOpts `{OrderDTO}
+%runElab deriveJSON defaultOpts `{PricedOrderDTO}
+%runElab deriveJSON defaultOpts `{ProductCodeDTO}
+%runElab deriveJSON defaultOpts `{ProductDTO}

@@ -48,11 +48,11 @@ namespace UpstreamDTO
     price       : Double
     description : String
 
-  %runElab deriveJSON defaultOpts `{{AddressFormDTO}}
-  %runElab deriveJSON defaultOpts `{{OrderLineFormDTO}}
-  %runElab deriveJSON defaultOpts `{{CustomerFormDTO}}
-  %runElab deriveJSON defaultOpts `{{OrderFormDTO}}
-  %runElab deriveJSON defaultOpts `{{ProductFormDTO}}
+  %runElab deriveJSON defaultOpts `{AddressFormDTO}
+  %runElab deriveJSON defaultOpts `{OrderLineFormDTO}
+  %runElab deriveJSON defaultOpts `{CustomerFormDTO}
+  %runElab deriveJSON defaultOpts `{OrderFormDTO}
+  %runElab deriveJSON defaultOpts `{ProductFormDTO}
 
 -- Outgoing information
 -- To Downstream systems
@@ -210,9 +210,9 @@ namespace DownstreamDTO
       <|> constructorFromJSON "MkAddressZipCodeError" MkAddressZipCodeError x
       <|> constructorFromJSON "CheckedAddressError" CheckedAddressError x
 
-  %runElab deriveJSON defaultOpts `{{NameValidationErrorDTO}}
-  %runElab deriveJSON defaultOpts `{{EmailValidationErrorDTO}}
-  %runElab deriveJSON defaultOpts `{{QuantityValidationErrorDTO}}
+  %runElab deriveJSON defaultOpts `{NameValidationErrorDTO}
+  %runElab deriveJSON defaultOpts `{EmailValidationErrorDTO}
+  %runElab deriveJSON defaultOpts `{QuantityValidationErrorDTO}
 
   ToJSON ValidationErrorDTO where
     toJSON (AddressValidation   x) = constructorToJSON "AddressValidation" x
@@ -227,15 +227,15 @@ namespace DownstreamDTO
       <|> constructorFromJSON "EmailValidation" EmailValidation x
       <|> constructorFromJSON "QuantityValidation" QuantityValidation x
 
-  %runElab deriveJSON defaultOpts `{{PricedOrderLineDsDTO}}
-  %runElab deriveJSON defaultOpts `{{AddressDsDTO}}
-  %runElab deriveJSON defaultOpts `{{BillableOrderPlacedDTO}}
-  %runElab deriveJSON defaultOpts `{{OrderAcknowledgementSentDTO}}
-  %runElab deriveJSON defaultOpts `{{ProductCodeErrDTO}}
-  %runElab deriveJSON defaultOpts `{{InvalidOrderDTO}}
-  %runElab deriveJSON defaultOpts `{{PricedOrderDsDTO}}
-  %runElab deriveJSON defaultOpts `{{PricingErrorDTO}}
-  %runElab deriveJSON defaultOpts `{{RemoteServiceErrorDTO}}
+  %runElab deriveJSON defaultOpts `{PricedOrderLineDsDTO}
+  %runElab deriveJSON defaultOpts `{AddressDsDTO}
+  %runElab deriveJSON defaultOpts `{BillableOrderPlacedDTO}
+  %runElab deriveJSON defaultOpts `{OrderAcknowledgementSentDTO}
+  %runElab deriveJSON defaultOpts `{ProductCodeErrDTO}
+  %runElab deriveJSON defaultOpts `{InvalidOrderDTO}
+  %runElab deriveJSON defaultOpts `{PricedOrderDsDTO}
+  %runElab deriveJSON defaultOpts `{PricingErrorDTO}
+  %runElab deriveJSON defaultOpts `{RemoteServiceErrorDTO}
 
   export
   ToJSON PlaceOrderEventDTO where

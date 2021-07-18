@@ -7,7 +7,7 @@ import Data.Either
 import Data.List
 import Data.Result
 import Data.StringN
-import Data.Strings
+import Data.String
 import Data.Form
 
 namespace Price
