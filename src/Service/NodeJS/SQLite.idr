@@ -1,6 +1,8 @@
 module Service.NodeJS.SQLite
 
 import Language.JSON
+import Language.JSON.Schema
+import Service.NodeJS.JSON
 import Service.NodeJS.Promise
 
 
@@ -38,7 +40,7 @@ namespace Error
   Show Error where
     show e = ffi_showError e
 
-%foreign "node:lambda: e => {if(e){return BigInt(0);}else{return BigInt(1);}}"
+%foreign "node:lambda: e => {if(e){return 0;}else{return 1;}}"
 ffi_isNull : Error -> PrimIO Bool
 
 isNull : Error -> IO Bool
@@ -50,41 +52,12 @@ occured e = do
   n <- liftIO $ isNull e
   pure $ if n then NoError else HasError e
 
-namespace Row
-
-  export
-  data Row : Type where [external]
-
-  %foreign "node:lambda: r => {if(r){return BigInt(0);}else{return BigInt(1);}}"
-  ffi_isNull : Row -> PrimIO Bool
-
-  isNull : Row -> IO Bool
-  isNull r = primIO (ffi_isNull r)
-
-  export
-  nonEmpty : Row -> IO (Maybe Row)
-  nonEmpty r = do
-    u <- isNull r
-    pure $ if u then Nothing else Just r
-
-  %foreign "node:lambda: r => {return JSON.stringify(r);}"
-  ffi_toString : Row -> PrimIO String
-
-  export
-  toString : Row -> IO String
-  toString r = primIO (ffi_toString r)
-
-  export
-  json : Row -> IO (Maybe JSON)
-  json r = do
-    jsonStr <- toString r
-    -- This is slow, we need a better JSON API
-    pure $ JSON.parse jsonStr
-
 namespace Database
 
   public export
   data Database : Type where [external]
+
+  %name Database db
 
   %foreign "node:lambda: db => (db.close())"
   ffi_close : Database -> PrimIO ()
@@ -105,46 +78,80 @@ namespace Database
       ok mErr))
 
   export
-  data GetRow : Type where [external]
+  data RawResult : Type where [external]
 
-  %foreign "node:lambda: r => {if(r){return BigInt(0);}else{return BigInt(1);}}"
-  ffi_isEmptyRow : GetRow -> PrimIO Bool
+  %foreign "node:lambda: r => {if(r){return 0;}else{return 1;}}"
+  ffi_isEmptyResult : RawResult -> PrimIO Bool
 
-  export
-  isEmptyRow : HasIO io => GetRow -> io Bool
-  isEmptyRow r = primIO (ffi_isEmptyRow r)
-
-  export
-  data NonEmptyRow : Type where [external]
+  isEmptyRow : HasIO io => RawResult -> io Bool
+  isEmptyRow r = primIO (ffi_isEmptyResult r)
 
   export
-  toNonEmpty : HasIO io => GetRow -> io (Maybe NonEmptyRow)
-  toNonEmpty r = if !(isEmptyRow r)
-    then pure Nothing
-    else pure $ Just $ believe_me r
-
-  %foreign "node:lambda: (u,r,f) => r[f]"
-  ffi_field : NonEmptyRow -> String -> PrimIO a
-
-  export
-  fieldStr : HasIO io => NonEmptyRow -> String -> io String
-  fieldStr row name = primIO (ffi_field row name)
-
-  export
-  fieldDouble : HasIO io => NonEmptyRow -> String -> io Double
-  fieldDouble row name = primIO (ffi_field row name)
+  nonEmpty : HasIO io => RawResult -> io (Maybe NodeJS.JSON.JSON)
+  nonEmpty r = pure $ if !(isEmptyRow r)
+    then Nothing
+    else Just $ believe_me r
 
   %foreign "node:lambda: (db,s,c) => (db.get(s,(e,r) => c(e)(r)()))"
-  ffi_get : Database -> String -> (Error -> GetRow -> PrimIO ()) -> PrimIO ()
+  ffi_get : Database -> String -> (Error -> RawResult -> PrimIO ()) -> PrimIO ()
 
-  export
-  get : Database -> Sql -> Promise (Either Error GetRow)
-  get db sql = promisify $ \ok, err => ffi_get db sql $ \e, row => toPrim $ do
+  rawGet : Database -> Sql -> Promise (Either Error RawResult)
+  rawGet db sql = promisify $ \ok, err => ffi_get db sql $ \e, row => toPrim $ do
     putStrLn sql
     mErr <- occured e
     case mErr of
       NoError     => ok $ Right row
       HasError e2 => ok $ Left e2
+
+  namespace NonSafe
+
+    public export
+    data Result
+      = GetError  Error
+      | JSONError String
+      | EmptyRow 
+      | Row       Data.JSON
+
+    export
+    get : Database -> String -> Promise Result
+    get db query = do
+      res <- rawGet db query
+      case res of
+        Left err => pure $ GetError err
+        Right raw => do
+          json <- nonEmpty raw
+          case json of
+            Nothing => pure EmptyRow
+            Just j0 =>
+              case !(convert j0) of
+                Nothing => pure $ JSONError "FFI JSON conversion"
+                Just j2 => pure $ Row j2
+
+  namespace Safe
+
+    public export
+    data Result : Schema -> Type where
+      GetError  : Error  -> Result s
+      JSONError : String -> Result s
+      EmptyRow            : Result s
+      Row       : JSON s -> Result s
+
+    export
+    get : Database -> (s : Schema) -> String -> Promise (Result s)
+    get db schema query = do
+      res <- rawGet db query
+      case res of
+        Left err => pure $ GetError err
+        Right raw => do
+          json <- nonEmpty raw
+          case json of
+            Nothing => pure EmptyRow
+            Just j0 =>
+              case !(convert j0) of
+                Nothing => pure $ JSONError "FFI JSON conversion"
+                Just j2 => case toIndexed schema j2 of
+                  Nothing => pure $ JSONError "Non-schema conforming."
+                  Just j3 => pure $ Row j3
 
 namespace SQLite
 

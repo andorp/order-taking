@@ -2,13 +2,17 @@ module BoundedContext.OrderTaking.Workflow.PlaceOrder.Database.Product
 
 import public Control.Monad.Either
 
+import Data.Maybe
 import Data.String
 import Control.Monad.Trans
 import Control.Monad.Reader
+import Language.JSON.Schema
 
 import Rango.DataTransfer.SQL.Syntax
+import Rango.Database.SQLite
 import Service.NodeJS.SQLite
 import Service.NodeJS.Promise
+import Service.NodeJS.JSON
 
 import BoundedContext.OrderTaking.Workflow.PlaceOrder.Database.DTO
 
@@ -28,13 +32,15 @@ public export
 data ProductDBError
   = InitializeError String
   | SaveProductError String
-  | NonExistingProduct String
+  | ProductRetrieveError String
+  | ConversionError String
 
 export
 Show ProductDBError where
-  show (InitializeError    e) = "InitializeError: " ++ show e
-  show (SaveProductError   e) = "SaveProductError: " ++ show e
-  show (NonExistingProduct e) = "NonExistingProduct: " ++ show e
+  show (InitializeError       e) = "InitializeError: " ++ show e
+  show (SaveProductError      e) = "SaveProductError: " ++ show e
+  show (ProductRetrieveError  e) = "ProductRetrieveError: " ++ show e
+  show (ConversionError       e) = "ConversionError: " ++ show e 
 
 export
 ProductDB : Type -> Type
@@ -56,6 +62,14 @@ throwIfFailE mkError p = do
     | Left err => throwError $ mkError !(toString err)
   pure result
 
+throwOnError : (String -> ProductDBError) -> Promise (Database.Safe.Result s) ->  ProductDB (Maybe (Indexed.JSON s))
+throwOnError mkError p = do
+  Row json <- lift (lift p)
+    | EmptyRow      => pure Nothing
+    | GetError  err => throwError $ mkError !(toString err)
+    | JSONError err => throwError $ mkError err
+  pure (Just json)
+
 export
 saveProduct : ProductDTO -> ProductDB ()
 saveProduct (MkProductDTO (MkProductCodeDTO productCode) price description) = do
@@ -70,23 +84,24 @@ saveProduct (MkProductDTO (MkProductCodeDTO productCode) price description) = do
 export
 productExists : ProductCodeDTO -> ProductDB Bool
 productExists (MkProductCodeDTO productCode) = do
-  db <- ask
-  row <- throwIfFailE NonExistingProduct
-       $ Database.get db $ renderCommand
+  db  <- ask
+  res <- throwOnError ProductRetrieveError
+       $ Rango.Database.SQLite.query db
        $ Select ["code", "description", "price"] productTable [("code", "=", "'\{productCode}'")]
-  pure $ maybe False (const True) !(toNonEmpty row)
+  pure $ isJust res
 
 export
 productPrice : ProductCodeDTO -> ProductDB Double
 productPrice (MkProductCodeDTO productCode) = do
   db <- ask
-  row0 <- throwIfFailE NonExistingProduct
-        $ Database.get db
-        $ renderCommand
-        $ Select ["code", "description", "price"] productTable [("code", "=", "'\{productCode}'")]
-  Just row <- toNonEmpty row0
-    | Nothing => throwError $ NonExistingProduct $ show productCode
-  fieldDouble row "price"
+  Just json  <- throwOnError ProductRetrieveError
+              $ Rango.Database.SQLite.query db
+              $ Select ["code", "description", "price"] productTable [("code", "=", "'\{productCode}'")]
+    | Nothing => throwError $ ProductRetrieveError $ show productCode
+  let Just (Number ** JNumber d) = getField json "price"
+        | Just  _ => throwError $ ProductRetrieveError "price field should have number type."
+        | Nothing => throwError $ ProductRetrieveError "price field was not found in DB."
+  pure d
 
 export
 initDB : IO ()

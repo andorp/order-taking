@@ -49,9 +49,9 @@ boundedContextHandler req rsp = resolve' (\_ => pure ()) (\err => pure ()) $ do
                           Response.end rsp "{\"message\":\"Couldn't parse Command DTO JSON.\"}"
                           pure Nothing
                   pure $ Just $ fromCommandDTO commandDTO
-                _  => do
+                path  => do
                   Response.statusCode rsp 400
-                  Response.end rsp "{\"message\":\"Unknown API endpoint.\"}"
+                  Response.end rsp $ "{\"message\":\"Unknown API endpoint: \{path} \"}"
                   pure Nothing
     | Nothing => pure ()
   result <- handleCommand cmd
