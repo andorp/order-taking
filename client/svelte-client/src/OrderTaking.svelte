@@ -22,10 +22,6 @@
     console.log('submitOrder response: ' + JSON.stringify(data));
   }
 
-  // function submitOrder() {
-  //   console.log('Submit order');
-  // }
-
   async function updateOrder() {
     const identifier = await getIdentifier();
     order = {
