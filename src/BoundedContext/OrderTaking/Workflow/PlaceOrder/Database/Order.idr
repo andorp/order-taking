@@ -2,15 +2,16 @@ module BoundedContext.OrderTaking.Workflow.PlaceOrder.Database.Order
 
 import public Control.Monad.Either
 
+import BoundedContext.OrderTaking.Workflow.PlaceOrder.Database.DTO
+
 import Data.String
 import Control.Monad.Trans
 import Control.Monad.Reader
 
 import Rango.DataTransfer.SQL.Syntax
+import Rango.Database.SQLite
 import Service.NodeJS.SQLite
 import Service.NodeJS.Promise
-
-import BoundedContext.OrderTaking.Workflow.PlaceOrder.Database.DTO
 
 
 ||| Value like table, meaning that it is highly redundant
@@ -174,9 +175,9 @@ initDB = do
   sqlite <- SQLite.require
   resolve' (\_ => putStrLn "OK.") putStrLn $ do
     db <- either !(SQLite.database sqlite "./db/order.db")
-    ignore $ Database.run db $ renderCommand $ CreateTable addressTable
-    ignore $ Database.run db $ renderCommand $ CreateTable customerTable
-    ignore $ Database.run db $ renderCommand $ CreateTable pricedOrderLineTable
-    ignore $ Database.run db $ renderCommand $ CreateTable pricedOrderLinesTable
-    ignore $ Database.run db $ renderCommand $ CreateTable pricedOrderTable
+    ignore $ command db $ CreateTable addressTable
+    ignore $ command db $ CreateTable customerTable
+    ignore $ command db $ CreateTable pricedOrderLineTable
+    ignore $ command db $ CreateTable pricedOrderLinesTable
+    ignore $ command db $ CreateTable pricedOrderTable
     ignore $ Database.close db

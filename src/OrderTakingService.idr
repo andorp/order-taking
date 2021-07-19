@@ -24,6 +24,9 @@ import BoundedContext.OrderTaking.Event
 import BoundedContext.OrderTaking.Workflow.PlaceOrder.Backend
 import BoundedContext.OrderTaking.Workflow.PlaceOrder.DTO
 
+import BoundedContext.OrderTaking.Workflow.PlaceOrder.Database.Order
+import BoundedContext.OrderTaking.Workflow.PlaceOrder.Database.Product
+
 
 handleCommand : Command.OrderTaking -> Promise (Either Error.OrderTaking Event.OrderTaking)
 handleCommand = boundedContext orderTakingImpl
@@ -75,9 +78,8 @@ startService = do
 
 initDB : IO ()
 initDB = do
-  pure ()
-  -- Database.Order.initDB
-  -- Database.Product.initDB
+  BoundedContext.OrderTaking.Workflow.PlaceOrder.Database.Order.initDB 
+  BoundedContext.OrderTaking.Workflow.PlaceOrder.Database.Product.initDB
 
 main : IO ()
 main = do

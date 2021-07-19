@@ -4,6 +4,8 @@
 ||| (C) The Idris Community, 2021
 module Rango.DataTransfer.JSON.Derive
 
+-- https://github.com/idris-community/idris2-lsp/blob/main/src/Language/LSP/Message/Derive.idr
+
 -- NOTE: Elaborator functions are evaluated as if they are defined inside the
 -- call location module, thus imported functions used inside elaborator
 -- functions should be exported publicly or explicitly imported at call
