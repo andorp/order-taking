@@ -308,7 +308,7 @@ namespace Components
     , showError   = id
     , serviceInfo = MkServiceInfo "NoOp Email" (MkUri "localhost")
     , send = \addr, html => do
-        putStrLn "\{value addr} : \{value html}"
+        putStrLn "\{addr.value} : \{html.value}"
         pure Nothing
     }
 

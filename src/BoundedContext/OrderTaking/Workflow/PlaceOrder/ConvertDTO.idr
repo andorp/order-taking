@@ -71,15 +71,15 @@ namespace ToDownstream
   toPlaceOrderEventDTO (InvalidOrderRegistered   x) = InvalidOrderRegistered    (toInvalidOrderDTO x)
 
   toPricedOrderDsDTO po = MkPricedOrderDsDTO
-    { orderId       = value po.orderId
+    { orderId       = po.orderId.value
     , orderLines    = map toPricedOrderLineDsDTO po.orderLines
-    , amountToBill  = value po.amountToBill
+    , amountToBill  = po.amountToBill.value
     }
 
   toPricedOrderLineDsDTO pol = MkPricedOrderLineDsDTO
-    { orderLineId = value pol.orderLine.orderLineId
-    , productCode = value pol.orderLine.productCode
-    , price       = value pol.price
+    { orderLineId = pol.orderLine.orderLineId.value
+    , productCode = pol.orderLine.productCode.value
+    , price       = pol.price.value
     }
 
   toAddressDsDTO a = MkAddressDsDTO
@@ -88,18 +88,18 @@ namespace ToDownstream
     , addressLine3 = maybe "" (.value) a.addressLine3
     , addressLine4 = maybe "" (.value) a.addressLine4
     , city         = a.city.value
-    , zipCode      = value a.zipCode
+    , zipCode      = a.zipCode.value
     }
 
   toBillableOrderPlacedDTO bop = MkBillableOrderPlacedDTO
-    { orderId         = value bop.orderId
+    { orderId         = bop.orderId.value
     , billingAddress  = toAddressDsDTO bop.billingAddress.address
-    , amountToBill    = value bop.amountToBill
+    , amountToBill    = bop.amountToBill.value
     }
 
   toAcknowledgementSentDTO as = MkOrderAcknowledgementSentDTO
-    { orderId      = value as.orderId
-    , emailAddress = value as.emailAddress
+    { orderId      = as.orderId.value
+    , emailAddress = as.emailAddress.value
     }
 
   toCheckedAddressValidationErrorDTO : CheckedAddressValidationError -> CheckedAddressValidationErrorDTO

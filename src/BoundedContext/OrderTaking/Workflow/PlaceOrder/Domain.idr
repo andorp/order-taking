@@ -24,12 +24,12 @@ namespace Price
   multiply (MkPrice x) d = MkPrice (x * d)
 
   export
-  value : Price -> Double
-  value (MkPrice x) = x
+  (.value) : Price -> Double
+  (.value) (MkPrice x) = x
 
   export
   sumPrices : List Price -> Price
-  sumPrices = MkPrice . sum . map value
+  sumPrices = MkPrice . sum . map (.value)
 
 namespace EmailAddress
 
@@ -41,8 +41,8 @@ namespace EmailAddress
   create = Just . MkEmailAddress -- TODO
 
   export
-  value : EmailAddress -> String
-  value (MkEmailAddress e) = e
+  (.value) : EmailAddress -> String
+  (.value) (MkEmailAddress e) = e
 
 public export
 record PersonalName where
@@ -66,8 +66,8 @@ namespace ZipCode
   create = Just . MkZipCode -- TODO
 
   export
-  value : ZipCode -> String
-  value (MkZipCode z) = z
+  (.value) : ZipCode -> String
+  (.value) (MkZipCode z) = z
 
 public export
 record AddressForm where
@@ -123,9 +123,9 @@ namespace ProductCode
   mkProductCode str = map WidgetProduct $ mkWidgetCode str
 
   export
-  value : ProductCode -> String
-  value (WidgetProduct (MkWidgetCode x)) = x
-  value (GizmoProduct (MkGizmoCode x)) = x
+  (.value) : ProductCode -> String
+  (.value) (WidgetProduct (MkWidgetCode x)) = x
+  (.value) (GizmoProduct (MkGizmoCode x)) = x
 
 public export
 record ProductForm where
@@ -180,9 +180,9 @@ namespace OrderQuantity
     | OrderKilogramQuantity KilogramQuantity
 
   export
-  value : OrderQuantity -> Double
-  value (OrderUnitQuantity     (MkUnitQuantity x))     = fromInteger $ x.value
-  value (OrderKilogramQuantity (MkKilogramQuantity x)) = x.value
+  (.value) : OrderQuantity -> Double
+  (.value) (OrderUnitQuantity     (MkUnitQuantity x))     = fromInteger $ x.value
+  (.value) (OrderKilogramQuantity (MkKilogramQuantity x)) = id $ x.value
 
 namespace OrderId
 
@@ -190,8 +190,8 @@ namespace OrderId
   data OrderId = MkOrderId String
 
   export
-  value : OrderId -> String
-  value (MkOrderId x) = x
+  (.value) : OrderId -> String
+  (.value) (MkOrderId x) = x
 
 namespace OrderLineId
 
@@ -199,8 +199,8 @@ namespace OrderLineId
   data OrderLineId = MkOrderLineId String
 
   export
-  value : OrderLineId -> String
-  value (MkOrderLineId x) = x
+  (.value) : OrderLineId -> String
+  (.value) (MkOrderLineId x) = x
 
 public export
 record OrderLine where
@@ -337,8 +337,8 @@ namespace HtmlString
   data HtmlString = MkHtmlString String
 
   export
-  value : HtmlString -> String
-  value (MkHtmlString x) = x
+  (.value) : HtmlString -> String
+  (.value) (MkHtmlString x) = x
 
 public export
 record OrderAcknowledgement where
@@ -385,7 +385,7 @@ Show PlacedOrderEvent where
 
 createBillingEvent : PricedOrder -> Maybe BillableOrderPlaced
 createBillingEvent pricedOrder = do
-  if value pricedOrder.amountToBill > 0
+  if pricedOrder.amountToBill.value > 0
      then Just $ MkBillableOrderPlaced
                   { orderId        = pricedOrder.orderId
                   , billingAddress = pricedOrder.billingAddress
@@ -656,7 +656,7 @@ validateOrder orderForm = do
 
 toPricedOrderLine : OrderLine -> POM PricedOrderLine
 toPricedOrderLine orderLine = do
-  let quantity = OrderQuantity.value $ orderLine.quantity
+  let quantity = orderLine.quantity.value
   priceVal <- GetProductPrice $ orderLine.productCode
   let price = multiply priceVal quantity
   pure $ MkPricedOrderLine

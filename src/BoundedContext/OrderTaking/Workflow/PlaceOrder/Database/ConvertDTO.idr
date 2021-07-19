@@ -12,7 +12,6 @@ export toProductDTO : Product -> ProductDTO
 
 orderIdentifier         : OrderId     -> Identifier
 orderLineIdentifier     : OrderLineId -> Identifier
-fromPrice               : Price       -> Double
 toCustomerDTO           : Identifier  -> CustomerInfo    -> CustomerDTO
 toAddressDTO            : Identifier  -> Address         -> AddressDTO
 fromBillingAddress      : Identifier  -> BillingAddress  -> AddressDTO
@@ -32,17 +31,15 @@ toPricedOrderDTO p
         , shippingAddress = fromShippingAddress            oid p.shippingAddress
         , billingAddress  = fromBillingAddress             oid p.billingAddress
         , orderLines      = map (toPricedOrderLineDTO oid) p.orderLines
-        , amount          = fromPrice                      p.amountToBill
+        , amount          = p.amountToBill.value
         }
-
-fromPrice p = value p
 
 toCustomerDTO i c
   = MkCustomerDTO
     { identifier   = i
     , firstName    = c.personalName.firstName.value
     , lastName     = c.personalName.lastName.value
-    , emailAddress = EmailAddress.value c.emailAddress
+    , emailAddress = c.emailAddress.value
     }
 
 toAddressDTO i a
@@ -53,7 +50,7 @@ toAddressDTO i a
     , addressLine3 = map (.value) a.addressLine3
     , addressLine4 = map (.value) a.addressLine4
     , city         = a.city.value
-    , zipCode      = ZipCode.value a.zipCode
+    , zipCode      = a.zipCode.value
     }
 
 fromBillingAddress  i (MkBillingAddress  ba) = toAddressDTO (i ++ "-BLN") ba
@@ -62,9 +59,9 @@ fromShippingAddress i (MkShippingAddress sa) = toAddressDTO (i ++ "-SHP") sa
 toPricedOrderLineDTO i po
   = MkPricedOrderLineDTO
     { identifier  = i ++ "-PO-" ++ orderLineIdentifier po.orderLine.orderLineId
-    , productCode = value po.orderLine.productCode
-    , quantity    = OrderQuantity.value po.orderLine.quantity
-    , price       = fromPrice po.price
+    , productCode = po.orderLine.productCode.value
+    , quantity    = po.orderLine.quantity.value
+    , price       = po.price.value
     }
 
 -- Product
@@ -75,6 +72,6 @@ toProductCodeDTO (GizmoProduct (MkGizmoCode x))   = MkProductCodeDTO x
 toProductDTO (MkProduct productCode price description)
   = MkProductDTO
     { productCode = toProductCodeDTO productCode
-    , price       = Price.value price
+    , price       = price.value
     , description = description.value
     }
