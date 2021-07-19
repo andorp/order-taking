@@ -17,19 +17,40 @@ In this setting, depedent typed programming helps us achieve maintanability rath
  In this repository I show a simple layered architecture and I show how to use simple dependent types
 to draw explicit connections between the high level design of a service and its NodeJS deployed implementation.
 Ideas and practices originated, but reshuffled from the [Type Driven Development with Idris by Edwin Brady](https://www.amazon.co.uk/Type-driven-Development-Idris-Edwin-Brady/dp/1617293024)
-and the [Domain Modeling Made Functional by Scott Wlaschin](https://www.amazon.co.uk/Domain-Modeling-Made-Functional-Domain-Driven/dp/1680502549). This architecture includes; An abstraction to
-talk about Bounded Context and Workflow, type safe description of a state transition system,
+and the [Domain Modeling Made Functional by Scott Wlaschin](https://www.amazon.co.uk/Domain-Modeling-Made-Functional-Domain-Driven/dp/1680502549).
+This architecture includes; An abstraction to talk about Bounded Context and Workflow, type safe description of a state transition system,
 a free monad approach for domain implementation, and an actual implementation of the domain on NodeJS back-end.
  Because of dependent types, this architecture becomes explicit, rather than implicit, meaning that
-the software developer really implements the `: BoundedContext OrderTaking -> Promise ()` function which is not
-realizable in other programming technologies to the best of the author's knowledge.
+connections between the high level design and the low level implementation are done via functions, changing
+the code anywhere requires to think at the whole, as possible type errors propagates to top or to bottom.
  Idris could immensely benefit from simple FFIs for NodeJS libraries. The FFIs would grant access to thousands
 of libraries from the NodeJS ecosystem almost for free. This approach would position Idris to be used even
 in production settings and the Idris userbase could be bootstrapped, later the Idris version of these
 libraries could be written.
 
+## Notes
+
+This project meant to be a blue-print, example for micro-services written in Idris. Its main focus is to reproduce
+abstractions in dependently typed setting, that can be found in Scott Wlashin's book. The main focus is
+around the dependently typed implementation of `BoundedContext`, but several other parts of the architecture
+had to be worked on to be able to demostrate that Idris can host such solutions. Although during the implementation
+many other problems were required to think about in the dependently typed setting. This repository can be
+considered as a mine initial practices for dependently typed software development. Enjoy digging up
+those gems.
+
+I hope in the future I will have time to present these ideas in a more natural way, in form
+of blog series, videos or a book. But for the time being the code should speak for itself.
+
+## Run
+
+After setted up; start the microservice with `make start-opt`, start the client service `npm run dev`,
+and open `localhost:5000` in a browser.
 
 ## Setup
+
+### Server
+
+Install Idris2, its version can be found in the VERSIONS file.
 
 For dependencies install `nodejs`, `npm` and packages:
 
@@ -46,5 +67,18 @@ the service on `127.0.0.1:3000`
 make start-opt
 ```
 
-Have fun!
+### Client
 
+An example client can be found in the `client/svelte-client` directory. Follow the instructions
+from its README.md
+
+To run the client, call the following command:
+
+```
+cd client/svelte-client
+npm run dev
+```
+
+Which starts the client in development mode, any changes in its code, will be picked up.
+
+Have fun!
