@@ -181,8 +181,8 @@ namespace OrderQuantity
 
   export
   value : OrderQuantity -> Double
-  value (OrderUnitQuantity     (MkUnitQuantity x))     = fromInteger $ value x
-  value (OrderKilogramQuantity (MkKilogramQuantity x)) = Between.value x
+  value (OrderUnitQuantity     (MkUnitQuantity x))     = fromInteger $ x.value
+  value (OrderKilogramQuantity (MkKilogramQuantity x)) = x.value
 
 namespace OrderId
 

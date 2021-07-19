@@ -40,19 +40,19 @@ fromPrice p = value p
 toCustomerDTO i c
   = MkCustomerDTO
     { identifier   = i
-    , firstName    = StringN.value c.personalName.firstName
-    , lastName     = StringN.value c.personalName.lastName
+    , firstName    = c.personalName.firstName.value
+    , lastName     = c.personalName.lastName.value
     , emailAddress = EmailAddress.value c.emailAddress
     }
 
 toAddressDTO i a
   = MkAddressDTO
     { identifier   = i
-    , addressLine1 = StringN.value a.addressLine1
-    , addressLine2 = map StringN.value a.addressLine2
-    , addressLine3 = map StringN.value a.addressLine3
-    , addressLine4 = map StringN.value a.addressLine4
-    , city         = StringN.value a.city
+    , addressLine1 = a.addressLine1.value
+    , addressLine2 = map (.value) a.addressLine2
+    , addressLine3 = map (.value) a.addressLine3
+    , addressLine4 = map (.value) a.addressLine4
+    , city         = a.city.value
     , zipCode      = ZipCode.value a.zipCode
     }
 
@@ -76,5 +76,5 @@ toProductDTO (MkProduct productCode price description)
   = MkProductDTO
     { productCode = toProductCodeDTO productCode
     , price       = Price.value price
-    , description = StringN.value description
+    , description = description.value
     }

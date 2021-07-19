@@ -83,11 +83,11 @@ namespace ToDownstream
     }
 
   toAddressDsDTO a = MkAddressDsDTO
-    { addressLine1 = value a.addressLine1
-    , addressLine2 = maybe "" value a.addressLine2
-    , addressLine3 = maybe "" value a.addressLine3
-    , addressLine4 = maybe "" value a.addressLine4
-    , city         = value a.city
+    { addressLine1 = a.addressLine1.value
+    , addressLine2 = maybe "" (.value) a.addressLine2
+    , addressLine3 = maybe "" (.value) a.addressLine3
+    , addressLine4 = maybe "" (.value) a.addressLine4
+    , city         = a.city.value
     , zipCode      = value a.zipCode
     }
 

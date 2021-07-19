@@ -53,5 +53,5 @@ create n s = do
 
 ||| Value extraction
 export
-value : StringN x -> String
-value (MkStringN s) = s
+(.value) : StringN x -> String
+(.value) (MkStringN s) = s
