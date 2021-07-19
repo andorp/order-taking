@@ -22,5 +22,5 @@ mkBetween x = do
 
 ||| Value extraction.
 export
-value : Between n l h -> n
-value (MkBetween v) = v
+(.value) : Between n l h -> n
+(.value) (MkBetween v) = v
