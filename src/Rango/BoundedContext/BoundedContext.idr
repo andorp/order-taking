@@ -31,7 +31,7 @@ import public Rango.BoundedContext.Workflow
 -- ╎   │                 │                     │           ╎
 -- ╎   ▼                 ▼                     ▼           ╎
 -- ╎ ┌───────────┐     ┌───────────────┐     ┌───────────┐ ╎
--- ╎ │ Workflow2 │     │    Workflow2  │     │ WorkflowN │ ╎
+-- ╎ │ Workflow1 │     │    Workflow2  │     │ WorkflowN │ ╎
 -- ╎ └───────────┘     └───────────────┘     └───────────┘ ╎
 -- ╎   │                 │                     │           ╎
 -- ╎   │                 │                     │           ╎
