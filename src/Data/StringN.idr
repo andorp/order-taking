@@ -13,6 +13,16 @@ export
 data StringN : Nat -> Type where
   MkStringN : (s : String) -> (length s `LTE` m) => StringN m
 
+-- StringN introduces and indexed datatype, with one data constructor.
+-- The 'MkStringN' data constructor has two arguments, the first one
+-- is a String, which has the name 's'. The second parameter is
+-- an implicit argument, which doesn't need to given when the
+-- MkStringN is used for creating value of the 'StringN' datatype.
+-- This second argument is implicit because the '=>' is used after
+-- its declaration. This tells Idris to search this parameter
+-- from some active context. More explanation will come for
+-- these when simpler datatypes are introduced.
+
 ||| A simple way of proving, or calculating the proof of 'LTE n m'
 |||
 ||| This approach is simpler than creating a DecEq as we know that
@@ -55,3 +65,8 @@ create n s = do
 export
 (.value) : StringN x -> String
 (.value) (MkStringN s) = s
+
+-- This first seems strange, but this will be convinient when combined with
+-- records in Idris.
+-- This is a postfix function. With this we can write code where we can chain
+-- function calls from one another. Like 'x.value.f.g'
