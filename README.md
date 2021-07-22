@@ -38,8 +38,11 @@ many other problems were required to think about in the dependently typed settin
 considered as a mine initial practices for dependently typed software development. Enjoy digging up
 those gems.
 
-I hope in the future I will have time to present these ideas in a more natural way, in form
-of blog series, videos or a book. But for the time being the code should speak for itself.
+You may find the style of the explanations strange, maybe a bit chaotic, but if you follow path suggested
+in the READMAP.md you will learn many things about the Idris language. This style feels chaotic that could
+be because I have a slight ADHD and I try to linarize the content here, but sometimes quickly the explanations
+go deep. Although I believe a short explanation after every Idris snippet helps to view this reposity as
+a hand-book for Idris development.
 
 ## Run
 
