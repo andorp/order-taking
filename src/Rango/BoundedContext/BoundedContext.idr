@@ -2,7 +2,71 @@ module Rango.BoundedContext.BoundedContext
 
 import public Rango.BoundedContext.Workflow
 
+||| Summary of a Bounded Context
+|||
+||| A collection of descriptive types, and their connection via
+||| simple functions. The command determines its workflow
+||| and its result.
+||| 
+||| Later the values of command, workflow, and event will
+||| be used for determining the underlying implementational
+||| 'Type's as we can use the power of dependent types
+||| to calculate Type from values.
+--
+-- Bounded Context overview in general
+--
+--                     ┌───────────────┐
+--                     │  CommandDTO   │
+--                     └───────────────┘
+--                       │
+--                       │
+--                       ▼
+-- ┌−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−┐
+-- ╎                    Bounded Context                    ╎
+-- ╎                                                       ╎
+-- ╎                   ┌───────────────┐                   ╎
+-- ╎   ┌────────────── │    Command    │ ──────┐           ╎
+-- ╎   │               └───────────────┘       │           ╎
+-- ╎   │                 │                     │           ╎
+-- ╎   │                 │                     │           ╎
+-- ╎   ▼                 ▼                     ▼           ╎
+-- ╎ ┌───────────┐     ┌───────────────┐     ┌───────────┐ ╎
+-- ╎ │ Workflow2 │     │    Workflow2  │     │ WorkflowN │ ╎
+-- ╎ └───────────┘     └───────────────┘     └───────────┘ ╎
+-- ╎   │                 │                     │           ╎
+-- ╎   │                 │                     │           ╎
+-- ╎   │                 ▼                     │           ╎
+-- ╎   │               ┌───────────────┐       │           ╎
+-- ╎   └─────────────▶ │     Event     │ ◀─────┘           ╎
+-- ╎                   └───────────────┘                   ╎
+-- ╎                                                       ╎
+-- └−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−┘
+--                       │
+--                       │
+--                       ▼
+--                     ┌───────────────┐
+--                     │   EventDTO    │
+--                     └───────────────┘
+public export
+record BoundedContext where
+  constructor MkBoundedContext
+  ||| Description of the command in the Bounded Context
+  command     : Type
+  ||| Description of the possible workflows in the Bounded Context
+  workflow    : Type
+  ||| Descriptio of the possible events in the Bounded Context
+  event       : Type
+  ||| Every command means one workflow
+  workflowOf  : command -> workflow
+  ||| Every command means one event
+  eventOf     : command -> event
 
+||| Environment of a workflow.
+|||
+||| Existential type for the Workflow; all the
+||| necessary information is available that is
+||| required for the workflow. This is a connection
+||| between the workflow abstraction and its use-cases.
 public export
 record WorkflowEnv where
   constructor MkWorkflowEnv
@@ -13,6 +77,10 @@ record WorkflowEnv where
   end      : state
   workflow : Workflow command branch start end
 
+||| Smart constructor for the Workflow.
+|||
+||| Capture all the parameters of a workflow
+||| in a Workflow environment.
 public export
 mkWorkflowEnv
   :  {st : Type}
@@ -22,22 +90,13 @@ mkWorkflowEnv
   -> (w : Workflow cm br s e) -> WorkflowEnv
 mkWorkflowEnv {st, cm, br, s, e} w = MkWorkflowEnv st cm br s e w
 
-public export
+||| Transform a WorkflowEnv with a workflow morphism.
 transformWorkflow
   :  Monad m
   => (w : WorkflowEnv)
   -> (mr : Morphism w.state m w.command w.branch)
   -> (mr.StateType w.start) -> m (mr.StateType w.end)
 transformWorkflow w mr x = morph mr w.workflow x
-
-public export
-record BoundedContext where
-  constructor MkBoundedContext
-  command     : Type
-  workflow    : Type
-  event       : Type
-  workflowOf  : command -> workflow
-  eventOf     : command -> event
 
 public export
 data Embedding : (from : Type -> Type) -> (err : Type) -> (to : Type -> Type) -> Type where
@@ -52,9 +111,11 @@ public export
 record BoundedContextImplementation (monad : Type -> Type) where
   constructor MkBoundedContextImplementation
 
+  ||| The high level description of the bounded context.
   context
     : BoundedContext
 
+  ||| Associate workflows with the values of the workflow description.
   workflow
     : context.workflow -> WorkflowEnv
   
@@ -132,3 +193,5 @@ boundedContext bc contextCommand = do
     Right wfVal => do
       evVal <- bc.createWorkflowEvent cmd wfVal
       map Right (bc.createFinalEvent cmd evVal)
+
+-- https://dot-to-ascii.ggerganov.com/ for ASCII art
