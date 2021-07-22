@@ -47,6 +47,7 @@ import public Rango.BoundedContext.Workflow
 --                     ┌───────────────┐
 --                     │   EventDTO    │
 --                     └───────────────┘
+--
 public export
 record BoundedContext where
   constructor MkBoundedContext
