@@ -182,7 +182,7 @@ namespace OrderQuantity
   export
   (.value) : OrderQuantity -> Double
   (.value) (OrderUnitQuantity     (MkUnitQuantity x))     = fromInteger $ x.value
-  (.value) (OrderKilogramQuantity (MkKilogramQuantity x)) = id $ x.value
+  (.value) (OrderKilogramQuantity (MkKilogramQuantity x)) = the _ x.value -- See https://github.com/idris-lang/Idris2/issues/1760
 
 namespace OrderId
 
@@ -714,13 +714,3 @@ createEvents pricedOrder orderAcknowledgementSent =
     , map AcknowledgementSentEvent orderAcknowledgementSent
     , map BillableOrderPlacedEvent $ createBillingEvent pricedOrder
     ]
-
--- Page 142
--- Page 167
--- Page 172
--- Page 178
--- Page 195
--- Page 220
--- Page 239
--- Page 251
--- Page 263
