@@ -35,14 +35,17 @@ abstractions in dependently typed setting, that can be found in Scott Wlashin's 
 around the dependently typed implementation of `BoundedContext`, but several other parts of the architecture
 had to be worked on to be able to demostrate that Idris can host such solutions. Although during the implementation
 many other problems were required to think about in the dependently typed setting. This repository can be
-considered as a mine initial practices for dependently typed software development. Enjoy digging up
-those gems.
+considered as a mine practices for dependently typed software development. Enjoy digging up those gems.
 
 You may find the style of the explanations strange, maybe a bit chaotic, but if you follow path suggested
-in the READMAP.md you will learn many things about the Idris language. This style feels chaotic that could
+in the [READMAP.md](https://github.com/andorp/order-taking/blob/main/READMAP.md) you will learn many things about the Idris language. This style feels chaotic that could
 be because I have a slight ADHD and I try to linarize the content here, but sometimes quickly the explanations
 go deep. Although I believe a short explanation after every Idris snippet helps to view this reposity as
 a hand-book for Idris development.
+
+## High level overview
+
+
 
 ## Run
 
