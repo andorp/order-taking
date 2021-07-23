@@ -109,8 +109,8 @@ namespace Implementation
   workflowMonadInstance PlaceOrder = %search
 
   public export
-  orderTakingImpl : BoundedContextImplementation Promise
-  orderTakingImpl = MkBoundedContextImplementation
+  orderTakingContext : BoundedContextImplementation Promise
+  orderTakingContext = MkBoundedContextImplementation
     { context                 = orderTaking
     , workflow                = workflowContexts
     , contextCommand          = Command.OrderTaking

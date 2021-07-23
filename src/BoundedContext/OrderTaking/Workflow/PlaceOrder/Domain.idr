@@ -1,7 +1,5 @@
 module BoundedContext.OrderTaking.Workflow.PlaceOrder.Domain
 
-import Rango.BoundedContext.Command
-
 import Data.Between
 import Data.Either
 import Data.List
