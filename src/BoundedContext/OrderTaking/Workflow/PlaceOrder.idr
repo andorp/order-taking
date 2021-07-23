@@ -8,12 +8,12 @@ import public Rango.BoundedContext.Workflow
 public export
 POStateType : Overview.State -> Type
 POStateType OrderForm          = Domain.OrderForm
-POStateType ValidatedOrder     = Either Domain.InvalidOrder Domain.Order
-POStateType Order              = Domain.Order
+POStateType Order              = Either Domain.InvalidOrder Domain.Order
+POStateType ValidOrder         = Domain.Order
 POStateType PricedOrder        = Domain.PricedOrder
 POStateType InvalidOrder       = Domain.InvalidOrder
 POStateType InvalidOrderQueued = List Domain.PlacedOrderEvent
-POStateType Finished           = List Domain.PlacedOrderEvent
+POStateType OrderInfo          = List Domain.PlacedOrderEvent
 
 pomTransition : Overview.Transition s e -> (POStateType s) -> POM (POStateType e)
 pomTransition ValidateOrder     st = validateOrder st
