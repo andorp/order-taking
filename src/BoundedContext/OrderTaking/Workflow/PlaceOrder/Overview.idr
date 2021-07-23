@@ -4,7 +4,7 @@ import Rango.BoundedContext.Workflow
 
 %default total
 
--- Overview of the Place-ValidOrder workflow:
+-- Overview of the Place Order workflow:
 --
 -- The incoming order form gets validated
 -- - if valid it is registered
@@ -19,9 +19,9 @@ import Rango.BoundedContext.Workflow
 --                                                   │
 --                                                   │ Validate Order
 --                                                   ▼
--- ┌─────────────┐    Create valid                 ┌────────────────────────────┐
--- │ ValidOrder  │   ◀──────────────────────────   │           Order            │
--- └─────────────┘                                 └────────────────────────────┘
+-- ┌─────────────┐    Create valid                 ┌============================┐
+-- │ ValidOrder  │   ◀──────────────────────────   I           Order            I
+-- └─────────────┘                                 └============================┘
 --   │                                               │
 --   │ Price                                         │ Create invalid
 --   ▼                                               ▼
