@@ -88,3 +88,7 @@ npm run dev
 Which starts the client in development mode, any changes in its code, will be picked up.
 
 Have fun!
+
+## ASCII ART
+
+[ASCII ART](https://dot-to-ascii.ggerganov.com/)

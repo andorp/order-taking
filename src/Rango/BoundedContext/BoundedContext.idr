@@ -194,5 +194,3 @@ boundedContext bc contextCommand = do
     Right wfVal => do
       evVal <- bc.createWorkflowEvent cmd wfVal
       map Right (bc.createFinalEvent cmd evVal)
-
--- https://dot-to-ascii.ggerganov.com/ for ASCII art
