@@ -16,8 +16,8 @@ namespace Request
   url : Request -> String
 
   export
-  body : Request -> Promise String
-  body req = promisify $ \ok, err => ffi_body req $ \content => toPrim $ ok content
+  (.body) : Request -> Promise String
+  (.body) req = promisify $ \ok, err => ffi_body req $ \content => toPrim $ ok content
 
 namespace Response
 
@@ -25,25 +25,25 @@ namespace Response
   data Response : Type where [external]
 
   %foreign "node:lambda: (r,c) => (r.statusCode = Number(c))"
-  ffi_statusCode : Response -> Int -> PrimIO ()
+  ffi_setStatusCode : Response -> Int -> PrimIO ()
 
   export
-  statusCode : HasIO io => Response -> Int -> io ()
-  statusCode r c = primIO (ffi_statusCode r c)
+  (.setStatusCode) : HasIO io => Response -> Int -> io ()
+  (.setStatusCode) r c = primIO (ffi_setStatusCode r c)
 
   %foreign "node:lambda: (r,h,v) => {r.setHeader(h, v)}"
   ffi_setHeader : Response -> String -> String -> PrimIO ()
 
   export
-  setHeader : HasIO io => Response -> String -> String -> io ()
-  setHeader r h v = primIO (ffi_setHeader r h v)
+  (.setHeader) : HasIO io => Response -> String -> String -> io ()
+  (.setHeader) r h v = primIO (ffi_setHeader r h v)
 
   %foreign "node:lambda: (r,e) => (r.end(e))"
   ffi_end : Response -> String -> PrimIO ()
 
   export
-  end : HasIO io => Response -> String -> io ()
-  end r e = primIO (ffi_end r e)
+  (.end) : HasIO io => Response -> String -> io ()
+  (.end) r e = primIO (ffi_end r e)
 
 namespace Server
 
@@ -54,8 +54,8 @@ namespace Server
   ffi_listen : Server -> Int -> String -> PrimIO ()
 
   export
-  listen : Server -> Int -> String -> IO ()
-  listen server port hostname = primIO (ffi_listen server port hostname)
+  (.listen) : Server -> Int -> String -> IO ()
+  (.listen) server port hostname = primIO (ffi_listen server port hostname)
 
 namespace HTTP
 
@@ -73,7 +73,6 @@ namespace HTTP
   ffi_createServer : HTTP -> (Request -> Response -> PrimIO ()) -> PrimIO Server
 
   export
-  createServer : HTTP -> (Request -> Response -> IO ()) -> IO Server
-  createServer http mkResult
-    = primIO (ffi_createServer http (\req , rsp => toPrim $ mkResult req rsp))
-
+  (.createServer) : HTTP -> (Request -> Response -> IO ()) -> IO Server
+  (.createServer) http mkResult
+      = primIO (ffi_createServer http (\req , rsp => toPrim $ mkResult req rsp))
