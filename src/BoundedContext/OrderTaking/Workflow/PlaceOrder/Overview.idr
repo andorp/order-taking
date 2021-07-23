@@ -111,13 +111,13 @@ workflow = do
 -- Graph Source:
 -- 
 -- digraph {
--- 	OrderForm 	 	  -> Order    		   	[label="Validate Order"];
---     InvalidOrder 	  -> InvalidOrderQeued 	[label="Queue" ];
---     ValidOrder 		  -> PricedOrder       	[label="Price" ]; 
---     PricedOrder  	  -> OrderInfo          [label="Create priced order info"];
---     InvalidOrderQeued -> OrderInfo          [label="Create invalid order info"];
-    
---     Order -> ValidOrder   [label="Create valid"];
---     Order -> InvalidOrder [label="Create invalid"];
+--  OrderForm         -> Order [label="Validate Order"];
+--  InvalidOrder      -> InvalidOrderQeued [label="Queue"];
+--  ValidOrder        -> PricedOrder [label="Price"]; 
+--  PricedOrder       -> OrderInfo [label="Create priced order info"];
+--  InvalidOrderQeued -> OrderInfo [label="Create invalid order info"];
+--
+--  Order -> ValidOrder   [label="Create valid"];
+--  Order -> InvalidOrder [label="Create invalid"];
 -- }
 -- 
