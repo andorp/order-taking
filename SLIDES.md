@@ -222,7 +222,7 @@ bounded contextes that interact with each other.
 
 ### Behaviour described in workflows
 
-Such as
+For example
 
 ```
 ┌−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−┐                                    
@@ -306,8 +306,19 @@ Explicit connection between high level definition of the workflow and its implem
 - [PlaceOrder.Overview](https://github.com/andorp/order-taking/blob/main/src/BoundedContext/OrderTaking/Workflow/PlaceOrder/Overview.idr)
 - [Rango.BoundedContext.Workflow DSL](https://github.com/andorp/order-taking/blob/main/src/Rango/BoundedContext/Workflow.idr)
 
-The implementation of the workflow, is a function from the high level description of the workflow, to a monadic state transition, via
+The implementation of the workflow, is a function from the high level description of the workflow to a monadic state transition, via
 the `morph` helper function:
+
+```
+placeOrder : Workflow Transition Check OrderForm OrderInfo
+placeOrder = do
+  Do ValidateOrder
+  Branch CheckInvalidOrder
+    (do Do AddInvalidOrder
+        Do SendInvalidOrder)
+    (do Do PriceOrder
+        Do SendAckToCustomer)
+```
 
 ```
 record Morphism (0 monad : Type -> Type) state (0 cmd : state -> state -> Type) (0 chk : state -> state -> state -> Type)
@@ -321,9 +332,9 @@ record Morphism (0 monad : Type -> Type) state (0 cmd : state -> state -> Type) 
 ```
 morph
   ...
-  -> (r : Morphism m state cmd chk)
+  -> (r : Morphism monad state cmd chk)
   -> Workflow cmd chk start end
-  -> (StateType r start) -> m (StateType r end)
+  -> (StateType r start) -> monad (StateType r end)
 morph r w = ...
 ```
 
