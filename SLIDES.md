@@ -34,7 +34,7 @@
 ╎ │       Design diagram       │ ╎
 ╎ └────────────────────────────┘ ╎
 ╎ ┌────────────────────────────┐ ╎
-╎ │      Detailed desing       │ ╎
+╎ │      Detailed design       │ ╎
 ╎ └────────────────────────────┘ ╎
 ╎ ┌────────────────────────────┐ ╎
 ╎ │ Data / Behavior definition │ ╎
@@ -272,7 +272,7 @@ one layer, will propagate through the semantic tower.
 ╎   │                            ╎
 ╎   ▼                            ╎
 ╎ ┌────────────────────────────┐ ╎
-╎ │      Detailed desing       │ ╎
+╎ │      Detailed design       │ ╎
 ╎ └────────────────────────────┘ ╎
 ╎   │                            ╎
 ╎   ▼                            ╎
