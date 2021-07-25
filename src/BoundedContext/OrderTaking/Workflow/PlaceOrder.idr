@@ -29,7 +29,7 @@ pomCheck : Check s b1 b2 -> (POStateType s) -> POM (Either (POStateType b1) (POS
 pomCheck CheckInvalidOrder st = pure st
 
 public export
-POMMorphism : Morphism Overview.State POM Overview.Transition Overview.Check
+POMMorphism : Morphism POM Overview.State Overview.Transition Overview.Check
 POMMorphism = MkMorphism
   { StateType = POStateType
   , command   = pomTransition

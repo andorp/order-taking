@@ -45,8 +45,8 @@ export
 
 public export
 record Morphism
+        (0 monad : Type -> Type)
         state
-        (0 m : Type -> Type)
         (0 cmd : state -> state -> Type)
         (0 obs : state -> state -> Type -> Type)
         (0 chk : state -> state -> state -> Type)
@@ -55,23 +55,21 @@ record Morphism
     StateType
       : state -> Type
     command
-      : {0 s,e : state} -> cmd s e -> (StateType s) -> m (StateType e)
+      : {0 s,e : state} -> cmd s e -> (StateType s) -> monad (StateType e)
     observe
-      : {0 t : Type} -> {0 s,e : state} -> obs s e t -> (StateType s) -> m (t, StateType e)
+      : {0 t : Type} -> {0 s,e : state} -> obs s e t -> (StateType s) -> monad (t, StateType e)
     check
       :  {0 s,b1,b2 : state}
       -> chk s b1 b2
-      -> (StateType s) -> m (Either (StateType b1) (StateType b2))
+      -> (StateType s) -> monad (Either (StateType b1) (StateType b2))
 
 export
 morph
-  :  Functor m
-  => Applicative m
-  => Monad m
-  => (r : Morphism state m cmd obs chk)
+  :  Functor monad => Applicative monad => Monad monad
+  => (r : Morphism monad state cmd obs chk)
   -> DynWorkflow t cmd obs chk start end
   -> (StateType r start)
-  -> m (x : t ** StateType r (end x))
+  -> monad (x : t ** StateType r (end x))
 morph r (Pure x) i = pure (x ** i)
 morph r (Do cmd) i = do
   o <- command r cmd i

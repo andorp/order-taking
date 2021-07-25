@@ -93,10 +93,10 @@ mkWorkflowEnv {st, cm, br, s, e} w = MkWorkflowEnv st cm br s e w
 
 ||| Transform a WorkflowEnv with a workflow morphism.
 transformWorkflow
-  :  Monad m
+  :  Monad monad
   => (w : WorkflowEnv)
-  -> (mr : Morphism w.state m w.command w.branch)
-  -> (mr.StateType w.start) -> m (mr.StateType w.end)
+  -> (mr : Morphism monad w.state w.command w.branch)
+  -> (mr.StateType w.start) -> monad (mr.StateType w.end)
 transformWorkflow w mr x = morph mr w.workflow x
 
 public export
@@ -159,7 +159,7 @@ record BoundedContextImplementation (monad : Type -> Type) where
     : (cmd : context.command) ->
       let w = context.workflowOf cmd
           d = workflow w
-      in Morphism (state d) (workflowMonad w) (WorkflowEnv.command d) (branch d)
+      in Morphism (workflowMonad w) (state d) (WorkflowEnv.command d) (branch d)
   createWorkflowEmbedding
     : (cmd : context.command) ->
       let w = context.workflowOf cmd

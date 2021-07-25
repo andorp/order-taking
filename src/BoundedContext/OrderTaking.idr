@@ -81,8 +81,8 @@ namespace Implementation
     :  (cmd : Command)
     -> let w = workflowOf cmd
        in Morphism
-            (WorkflowEnv.state (workflowContexts (w)))
             (workflowMonad w)
+            (WorkflowEnv.state (workflowContexts (w)))
             (WorkflowEnv.command (workflowContexts w))
             (WorkflowEnv.branch (workflowContexts w))
   workflowMorphism PlaceOrder = POMMorphism

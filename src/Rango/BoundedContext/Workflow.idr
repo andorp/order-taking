@@ -46,8 +46,8 @@ data Workflow
 ||| with the actual implementation.
 public export
 record Morphism
+        (0 monad : Type -> Type)
         state
-        (0 monad : Type -> Type) -- TODO: Move this to the first parameter
         (0 cmd : state -> state -> Type)
         (0 chk : state -> state -> state -> Type)
   where
@@ -72,12 +72,10 @@ record Morphism
 ||| with the actual implementation.
 export
 morph
-  :  Functor m
-  => Applicative m
-  => Monad m
-  => (r : Morphism state m cmd chk)
+  :  Functor monad => Applicative monad => Monad monad
+  => (r : Morphism monad state cmd chk)
   -> Workflow cmd chk start end
-  -> (StateType r start) -> m (StateType r end)
+  -> (StateType r start) -> monad (StateType r end)
 morph r (Do cmd) i = command r cmd i
 morph r (m1 >> m2) i = do
   x <- morph r m1 i
