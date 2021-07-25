@@ -447,58 +447,58 @@ maybeProductCodeError _ = Nothing
 
 ||| Place Order Monad
 |||
-||| POM is shorthand for PlaceOrderMonad. This is a syntactical constructs of the
+||| PlaceOrderDSL is shorthand for PlaceOrderMonad. This is a syntactical constructs of the
 ||| different expressions that can be build in the PlaceOrder domain. Because
-||| POM has Pure and Bind it inposes a monadic structure, but POM is purely syntactic
+||| PlaceOrderDSL has Pure and Bind it inposes a monadic structure, but PlaceOrderDSL is purely syntactic
 ||| construction. Categorically it is a commands inlined free monad.
 export
-data POM : Type -> Type where
+data PlaceOrderDSL : Type -> Type where
   -- Monad interface
-  Pure : a -> POM a
-  Bind : POM a -> Inf (a -> POM b) -> POM b
+  Pure : a -> PlaceOrderDSL a
+  Bind : PlaceOrderDSL a -> Inf (a -> PlaceOrderDSL b) -> PlaceOrderDSL b
 
   -- Throwing some error
   -- Throwing error needs to help the type-checker with the expected type of the
-  -- POM result.
-  ThrowError : (a : Type) -> PlaceOrderError -> POM a
-  CatchError : {a : Type} -> POM a -> POM (Either PlaceOrderError a)
+  -- PlaceOrderDSL result.
+  ThrowError : (a : Type) -> PlaceOrderError -> PlaceOrderDSL a
+  CatchError : {a : Type} -> PlaceOrderDSL a -> PlaceOrderDSL (Either PlaceOrderError a)
 
   -- Order handling
-  NewOrderId : POM OrderId
-  NewOrderLineId : POM OrderLineId
+  NewOrderId : PlaceOrderDSL OrderId
+  NewOrderLineId : PlaceOrderDSL OrderLineId
 
   -- Validate Order Commands
-  CheckProductCodeExists : ProductCode -> POM Bool
-  CheckAddressExists     : AddressForm -> POM (Either CheckedAddressValidationError CheckedAddress)
+  CheckProductCodeExists : ProductCode -> PlaceOrderDSL Bool
+  CheckAddressExists     : AddressForm -> PlaceOrderDSL (Either CheckedAddressValidationError CheckedAddress)
 
   -- Price Order Commands
-  GetProductPrice : ProductCode -> POM Price
-  PlacePricedOrder : PricedOrder -> POM ()
+  GetProductPrice : ProductCode -> PlaceOrderDSL Price
+  PlacePricedOrder : PricedOrder -> PlaceOrderDSL ()
 
   -- Acknowledgement Order Commands
-  CreateOrderAcknowledgementLetter : PricedOrder -> POM HtmlString
-  SendOrderAcknowledgement : OrderAcknowledgement -> POM AckSent
+  CreateOrderAcknowledgementLetter : PricedOrder -> PlaceOrderDSL HtmlString
+  SendOrderAcknowledgement : OrderAcknowledgement -> PlaceOrderDSL AckSent
 
 export
-Functor POM where
+Functor PlaceOrderDSL where
   map f m = Bind m (Pure . f)
 
 export
-Applicative POM where
+Applicative PlaceOrderDSL where
   pure = Pure
   f <*> x = Bind f (\f' => Bind x (\x' => Pure (f' x')))
 
 export
-Monad POM where
+Monad PlaceOrderDSL where
   join  m = Bind m id
   m >>= k = Bind m k
 
-||| A model for the POM structure.
+||| A model for the PlaceOrderDSL structure.
 |||
-||| As POM is purely a syntactical construct, we need to give a semantical model for such
-||| a construct. Semantical models can be given for POM in any monad where we can give
-||| interpretetations of the POM constructs.
-||| Categorically this is a monad morphism between the POM monad an interpretation monad if it.
+||| As PlaceOrderDSL is purely a syntactical construct, we need to give a semantical model for such
+||| a construct. Semantical models can be given for PlaceOrderDSL in any monad where we can give
+||| interpretetations of the PlaceOrderDSL constructs.
+||| Categorically this is a monad morphism between the PlaceOrderDSL monad an interpretation monad if it.
 public export
 record Model (m : Type -> Type) where
   constructor MkModel
@@ -523,10 +523,10 @@ record Model (m : Type -> Type) where
   sendOrderAcknowledgement
     : OrderAcknowledgement -> m AckSent
 
-||| The function that gives interpretation of a POM expression in the monad 'm' using the
+||| The function that gives interpretation of a PlaceOrderDSL expression in the monad 'm' using the
 ||| given model.
 export
-interpret : Monad m => Model m -> POM a -> m a
+interpret : Monad m => Model m -> PlaceOrderDSL a -> m a
 interpret model (Pure x)                             = pure x
 interpret model (Bind m k)                           = interpret model m >>= (interpret model . k)
 interpret model (ThrowError _ x)                     = model.throwError x
@@ -554,7 +554,7 @@ checkCustomerInfoForm customer =
               EmailAddress.create
               (EmailValidation (MkEmailValidationError customer.emailAddress))
 
-createCustomerInfo : CustomerInfoForm -> POM CustomerInfo
+createCustomerInfo : CustomerInfoForm -> PlaceOrderDSL CustomerInfo
 createCustomerInfo customer = do
   let Value customerInfo = checkCustomerInfoForm customer
       | Error es => ThrowError CustomerInfo $ ValidationErrors es
@@ -570,7 +570,7 @@ checkAddressForm addr =
     <*> field addr.city (StringN.create 50) (MkAddressCityError addr.city)
     <*> field addr.zipCode ZipCode.create   (MkAddressZipCodeError addr.zipCode)
 
-toAddress : AddressForm -> POM Address
+toAddress : AddressForm -> PlaceOrderDSL Address
 toAddress addressForm = do
   Right (MkCheckedAddress checkedAddressForm) <- CheckAddressExists addressForm
     | Left e => ThrowError Address
@@ -580,7 +580,7 @@ toAddress addressForm = do
       | Error es => ThrowError Address $ ValidationErrors $ map AddressValidation es
   pure addr
 
-toProductCode : String -> POM ProductCode
+toProductCode : String -> PlaceOrderDSL ProductCode
 toProductCode productCodeStr = do
   let Just productCode = mkProductCode productCodeStr
       | _ => ThrowError ProductCode
@@ -594,7 +594,7 @@ toProductCode productCodeStr = do
             $ "Product doesn't exist " ++ productCodeStr
   pure productCode
 
-toOrderQuantity : ProductCode -> String -> POM OrderQuantity
+toOrderQuantity : ProductCode -> String -> PlaceOrderDSL OrderQuantity
 toOrderQuantity (WidgetProduct wp) quantity = do
   let Just integer = the (Maybe Integer) $ parseInteger quantity
       | _ => ThrowError OrderQuantity
@@ -616,7 +616,7 @@ toOrderQuantity (GizmoProduct gp) quantity = do
                     [ QuantityValidation (MkQuantityValidationError "in between" quantity) ]
   pure $ OrderKilogramQuantity $ MkKilogramQuantity between
 
-toValidatedOrderLine : OrderLineForm -> POM OrderLine
+toValidatedOrderLine : OrderLineForm -> PlaceOrderDSL OrderLine
 toValidatedOrderLine orderLineForm = do
   orderLineId <- NewOrderLineId
   productCode <- toProductCode orderLineForm.productCode
@@ -628,7 +628,7 @@ toValidatedOrderLine orderLineForm = do
     }
 
 export
-validateOrder : OrderForm -> POM (Either InvalidOrder Order)
+validateOrder : OrderForm -> PlaceOrderDSL (Either InvalidOrder Order)
 validateOrder orderForm = do
   orderId      <- NewOrderId
   customerInfo <- createCustomerInfo $ orderForm.customerInfo
@@ -652,7 +652,7 @@ validateOrder orderForm = do
 
 -- The Pricing Step
 
-toPricedOrderLine : OrderLine -> POM PricedOrderLine
+toPricedOrderLine : OrderLine -> PlaceOrderDSL PricedOrderLine
 toPricedOrderLine orderLine = do
   let quantity = orderLine.quantity.value
   priceVal <- GetProductPrice $ orderLine.productCode
@@ -663,7 +663,7 @@ toPricedOrderLine orderLine = do
     }
 
 export
-priceOrder : Order -> POM PricedOrder
+priceOrder : Order -> PlaceOrderDSL PricedOrder
 priceOrder order = do
   pricedOrderLines <- traverse toPricedOrderLine order.orderLines
   let amountToBill = sumPrices $ map price pricedOrderLines
@@ -679,7 +679,7 @@ priceOrder order = do
 -- The Acknowledge Order Step
 
 export
-acknowledgeOrder : PricedOrder -> POM (Maybe OrderAcknowledgementSent)
+acknowledgeOrder : PricedOrder -> PlaceOrderDSL (Maybe OrderAcknowledgementSent)
 acknowledgeOrder pricedOrder = do
   letter <- CreateOrderAcknowledgementLetter pricedOrder
   let acknowledgement
@@ -701,7 +701,7 @@ acknowledgeOrder pricedOrder = do
 -- Place order step
 
 export
-placePricedOrder : PricedOrder -> POM ()
+placePricedOrder : PricedOrder -> PlaceOrderDSL ()
 placePricedOrder = PlacePricedOrder
 
 export

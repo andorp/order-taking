@@ -61,7 +61,7 @@ namespace Implementation
   workflowContexts PlaceOrder = mkWorkflowEnv PlaceOrder.Overview.workflow
 
   workflowMonad : W.Workflow -> (Type -> Type)
-  workflowMonad PlaceOrder = POM
+  workflowMonad PlaceOrder = PlaceOrderDSL
 
   errorDomainType : W.Workflow -> Type
   errorDomainType PlaceOrder = PlaceOrderError
@@ -85,7 +85,7 @@ namespace Implementation
             (WorkflowEnv.state (workflowContexts (w)))
             (WorkflowEnv.command (workflowContexts w))
             (WorkflowEnv.branch (workflowContexts w))
-  workflowMorphism PlaceOrder = POMMorphism
+  workflowMorphism PlaceOrder = PlaceOrderMorphism
  
   createWorkflowEvent
     :  (cmd : Command)
