@@ -303,7 +303,7 @@ one layer, will propagate through the semantic tower.
 
 Explicit connection between high level definition of the workflow and its implementation.
 
-- [PlaceOrder.Overview](https://github.com/andorp/order-taking/blob/main/src/BoundedContext/OrderTaking/Workflow/PlaceOrder/Overview.idr
+- [PlaceOrder.Overview](https://github.com/andorp/order-taking/blob/main/src/BoundedContext/OrderTaking/Workflow/PlaceOrder/Overview.idr)
 - [Rango.BoundedContext.Workflow DSL](https://github.com/andorp/order-taking/blob/main/src/Rango/BoundedContext/Workflow.idr)
 
 The implementation of the workflow, is a function from the high level description of the workflow, to a monadic state transition, via
@@ -390,7 +390,7 @@ morph r w = ...
   Connect to external sources.
 - [NodeJS Promise Monad](https://github.com/andorp/order-taking/blob/main/src/Service/NodeJS/Promise.idr#L6)
   Make run everything with event driven approach of NodeJS.
-- [NodeJS Runtime](https://github.com/andorp/order-taking/blob/main/Makefile#L29)
+- [NodeJS Runtime](https://github.com/andorp/order-taking/tree/main/src/Service/NodeJS)
   Use third party libraries, such as HTTP, SQLite
 
 ### TODO: More slides ...
