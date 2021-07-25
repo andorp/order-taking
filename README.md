@@ -45,7 +45,7 @@ a hand-book for Idris development.
 
 ## High level overview
 
-
+See the [slides](https://github.com/andorp/order-taking/blob/main/SLIDES.md)
 
 ## Run
 
