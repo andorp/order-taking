@@ -321,7 +321,7 @@ placeOrder = do
 ```
 
 ```
-record Morphism (0 monad : Type -> Type) state (0 cmd : state -> state -> Type) (0 chk : state -> state -> state -> Type)
+record Morphism (monad : Type -> Type) state (cmd : state -> state -> Type) (chk : state -> state -> state -> Type)
   where
     constructor MkMorphism
     StateType : state -> Type
@@ -386,22 +386,59 @@ morph r w = ...
 └−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−┘
 ```
 
-### Full architecture, explanation
+### Bounded Context implementation
 
-- [Order Taking Bounded Context](https://github.com/andorp/order-taking/blob/main/src/BoundedContext/OrderTaking.idr#L45)
+[Source](https://github.com/andorp/order-taking/blob/main/src/Rango/BoundedContext/BoundedContext.idr#L52)
+
+```idris
+record BoundedContext where
+  constructor MkBoundedContext
+  command     : Type
+  workflow    : Type
+  event       : Type
+  workflowOf  : command -> workflow
+  eventOf     : command -> event
+```
+
+[Source](https://github.com/andorp/order-taking/blob/main/src/Rango/BoundedContext/BoundedContext.idr#L183)
+
+```idris
+boundedContext
+  :  (Monad m)
+  => (bc : BoundedContextImplementation m) -> bc.contextCommand -> m (Either bc.contextError bc.contextEvent)
+boundedContext bc contextCommand = do
+  (cmd ** cmdData) <- bc.createCommand contextCommand
+  workflowRunner <- bc.createWorkflowEmbedding cmd
+  let workflowMonadInstance = bc.workflowMonadInstance (bc.context.workflowOf cmd) -- For transformWorkflow
+  input  <- bc.createStartState cmd cmdData
+  result <- runEmbedding workflowRunner (transformWorkflow (bc.workflow (bc.context.workflowOf cmd)) (bc.workflowMorphism cmd) input)
+  case result of
+    Left err => map Left (bc.createFinalError (bc.context.workflowOf cmd) err)
+    Right wfVal => do
+      evVal <- bc.createWorkflowEvent cmd wfVal
+      map Right (bc.createFinalEvent cmd evVal)
+```
+
+- Bounded Context computation lives in its monad
+- Every workflow has its own monad, which must be embeddable to the monad of the bounded context
+- Note the dependentt pair and its use `(cmd ** cmdData) <- bc.createCommand contextCommand`
+
+### Full architecture, explained
+
+- [Order Taking Bounded Context](https://github.com/andorp/order-taking/blob/main/src/BoundedContext/OrderTaking.idr#L45)  
   Simple enum like ADTs to name commands, workflows, events
-- [Place Order Workflow](https://github.com/andorp/order-taking/blob/main/src/BoundedContext/OrderTaking/Workflow/PlaceOrder/Overview.idr#L95)
+- [Place Order Workflow](https://github.com/andorp/order-taking/blob/main/src/BoundedContext/OrderTaking/Workflow/PlaceOrder/Overview.idr#L95)  
   Indexed datatype to represent workflow as state transition system.
-- [Place Order DSL (Free Monad)](https://github.com/andorp/order-taking/blob/main/src/BoundedContext/OrderTaking/Workflow/PlaceOrder/Domain.idr#L455)
-  Detailed information in datatypes, building blocks of behaviour,
+- [Place Order DSL (Free Monad)](https://github.com/andorp/order-taking/blob/main/src/BoundedContext/OrderTaking/Workflow/PlaceOrder/Domain.idr#L455)  
+  Detailed information in datatypes, building blocks of behaviour,  
   implementation of workflow steps based on building blocks.
-- [Place Order Backend Monad](https://github.com/andorp/order-taking/blob/main/src/BoundedContext/OrderTaking/Workflow/PlaceOrder/Backend.idr#L185)
+- [Place Order Backend Monad](https://github.com/andorp/order-taking/blob/main/src/BoundedContext/OrderTaking/Workflow/PlaceOrder/Backend.idr#L185)  
   Model of the Place Order DSL, real implementation of the building blocks
-- [Place Order Database Monads](https://github.com/andorp/order-taking/blob/main/src/BoundedContext/OrderTaking/Workflow/PlaceOrder/Database/Order.idr#L150)
+- [Place Order Database Monads](https://github.com/andorp/order-taking/blob/main/src/BoundedContext/OrderTaking/Workflow/PlaceOrder/Database/Order.idr#L150)  
   Connect to external sources.
-- [NodeJS Promise Monad](https://github.com/andorp/order-taking/blob/main/src/Service/NodeJS/Promise.idr#L6)
+- [NodeJS Promise Monad](https://github.com/andorp/order-taking/blob/main/src/Service/NodeJS/Promise.idr#L6)  
   Make run everything with event driven approach of NodeJS.
-- [NodeJS Runtime](https://github.com/andorp/order-taking/tree/main/src/Service/NodeJS)
+- [NodeJS Runtime](https://github.com/andorp/order-taking/tree/main/src/Service/NodeJS)  
   Use third party libraries, such as HTTP, SQLite
 
 ### TODO: More slides ...
