@@ -759,7 +759,7 @@ data Query : Type where
 Select ["code", "description", "price"] productTable [("code", "=", "'\{productCode}'")]
 ```
 
-### JSON with schema
+### JSON Schema
 
 ```idris
 data Presence = Optional | Required
@@ -823,7 +823,7 @@ renderCommand (Insert table values)
   = "INSERT INTO \{table.name} (\{withCommas (renderInsertNames table.fields)}) VALUES (\{withCommas (renderInsertValues values)})"
 ```
 
-Forget this line:
+Forgot this line:
 ```idris
 renderFieldValue {t=FieldOfTy n s} (FieldOf _ x) = renderFieldValue x
 ```
@@ -841,4 +841,4 @@ and got this in the logs:
 INSERT INTO productTable (...) VALUES ((╯°□°)╯︵ ┻━┻, (╯°□°)╯︵ ┻━┻, (╯°□°)╯︵ ┻━┻)
 ```
 
-## QED
+## QED :)
