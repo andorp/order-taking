@@ -138,8 +138,7 @@ mkRunBackend
   => HasIO io
   => io RunBackend
 mkRunBackend = do
-  sqlite <- SQLite.require
-  md5    <- MD5.require
+  md5 <- MD5.require
   pure $ MkRunBackend $ \type, script => do
     -- Open DB conenctions
     orderDBConn
