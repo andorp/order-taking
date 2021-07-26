@@ -698,6 +698,14 @@ createWorkflowEmbedding PlaceOrder = do
   pure $ MkEmbedding (\type, x => map (the (Either PlaceOrderError type)) (runBackend rb (interpret backend x)))
 ```
 
+```idris
+data Embedding : (from : Type -> Type) -> (err : Type) -> (to : Type -> Type) -> Type where
+  MkEmbedding : ((a : Type) -> from a -> to (Either err a)) -> Embedding from err to
+
+runEmbedding : {a : Type} -> Embedding f e t -> f a -> t (Either e a)
+runEmbedding (MkEmbedding f) y = f a y
+```
+
 ### Type safe SQL commands
 
 ```idris
