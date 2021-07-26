@@ -553,12 +553,10 @@ record BoundedContextImplementation (monad : Type -> Type) where
 Even encapsulate Monad instances
 
 ```idris
-...
   workflowMonad
     : context.workflow -> (Type -> Type)
   workflowMonadInstance
     : (w : context.workflow) -> Monad (workflowMonad w)
-...
 ```
 
 ### Free Monadic DSL of a workflow
@@ -607,6 +605,22 @@ record Model (m : Type -> Type) where
     : PricedOrder -> m HtmlString
   sendOrderAcknowledgement
     : OrderAcknowledgement -> m AckSent
+```
+
+```idris
+interpret : Monad m => Model m -> PlaceOrderDSL a -> m a
+interpret model (Pure x)                             = pure x
+interpret model (Bind m k)                           = interpret model m >>= (interpret model . k)
+interpret model (ThrowError _ x)                     = model.throwError x
+interpret model (CatchError x)                       = model.catchError (interpret model x)
+interpret model NewOrderId                           = model.newOrderId
+interpret model NewOrderLineId                       = model.newOrderLineId
+interpret model (CheckProductCodeExists x)           = model.checkProductCodeExists x
+interpret model (CheckAddressExists x)               = model.checkAddressExists x
+interpret model (GetProductPrice x)                  = model.getProductPrice x
+interpret model (PlacePricedOrder x)                 = model.placePricedOrder x
+interpret model (CreateOrderAcknowledgementLetter x) = model.createOrderAcknowledgementLetter x
+interpret model (SendOrderAcknowledgement x)         = model.sendOrderAcknowledgement x
 ```
 
 NOTE: Even datatypes could be abstracted, but here that was not necesary.
@@ -663,17 +677,17 @@ mkRunBackend
 mkRunBackend = ...
 ```
 
-```
-  createWorkflowEmbedding
-    :  (cmd : Command)
-    -> Promise (Embedding (workflowMonad (workflowOf cmd)) (errorDomainType (workflowOf cmd)) Promise)
-  createWorkflowEmbedding PlaceOrder = do
-    let orderDBComp       = orderDBSQLite
-    let productDBComp     = productDBSQlite
-    let emailComp         = noEmail
-    let checkAddressComp  = okCheckAddress
-    rb <- mkRunBackend
-    pure $ MkEmbedding (\type, x => map (the (Either PlaceOrderError type)) (runBackend rb (interpret backend x)))
+```idris
+createWorkflowEmbedding
+  :  (cmd : Command)
+  -> Promise (Embedding (workflowMonad (workflowOf cmd)) (errorDomainType (workflowOf cmd)) Promise)
+createWorkflowEmbedding PlaceOrder = do
+  let orderDBComp       = orderDBSQLite
+  let productDBComp     = productDBSQlite
+  let emailComp         = noEmail
+  let checkAddressComp  = okCheckAddress
+  rb <- mkRunBackend
+  pure $ MkEmbedding (\type, x => map (the (Either PlaceOrderError type)) (runBackend rb (interpret backend x)))
 ```
 
 ### TODO: More slides ...
