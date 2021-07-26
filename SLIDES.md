@@ -561,6 +561,12 @@ Even encapsulate Monad instances
 
 ### Free Monadic DSL of a workflow
 
+The Free Monad DSL allows us to easily replace the implementation. Idris is a multi-backend
+compiler, with this approach the same solution can have multiple tech environments. Imagine
+the same code deployed to NodeJS, Python, JVM, linux with ChezScheme.
+
+Write the implementation in a Domain.
+
 ```idris
 data PlaceOrderDSL : Type -> Type where
   Pure : a -> PlaceOrderDSL a
@@ -581,6 +587,8 @@ data PlaceOrderDSL : Type -> Type where
   CreateOrderAcknowledgementLetter : PricedOrder          -> PlaceOrderDSL HtmlString
   SendOrderAcknowledgement         : OrderAcknowledgement -> PlaceOrderDSL AckSent
 ```
+
+And model it with many backends...
 
 ```idris
 record Model (m : Type -> Type) where
