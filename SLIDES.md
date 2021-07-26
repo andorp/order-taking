@@ -828,6 +828,7 @@ Forgot this line:
 renderFieldValue {t=FieldOfTy n s} (FieldOf _ x) = renderFieldValue x
 ```
 
+Called this:
 ```idris
 Insert productTable
   [ FieldOf "code"        (SQLText productCode)
