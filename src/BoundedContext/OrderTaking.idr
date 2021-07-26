@@ -44,9 +44,9 @@ namespace Implementation
   public export
   orderTaking : BoundedContext
   orderTaking = MkBoundedContext
-    { command     = Command
-    , workflow    = Workflow
-    , event       = Event
+    { Command     = Command
+    , Workflow    = Workflow
+    , Event       = Event
     , workflowOf  = workflowOf
     , eventOf     = eventOf
     }
@@ -82,9 +82,9 @@ namespace Implementation
     -> let w = workflowOf cmd
        in Morphism
             (workflowMonad w)
-            (WorkflowEnv.state (workflowContexts (w)))
-            (WorkflowEnv.command (workflowContexts w))
-            (WorkflowEnv.branch (workflowContexts w))
+            (WorkflowEnv.State (workflowContexts (w)))
+            (WorkflowEnv.Command (workflowContexts w))
+            (WorkflowEnv.Branch (workflowContexts w))
   workflowMorphism PlaceOrder = PlaceOrderMorphism
  
   createWorkflowEvent
@@ -112,15 +112,15 @@ namespace Implementation
   orderTakingContext : BoundedContextImplementation Promise
   orderTakingContext = MkBoundedContextImplementation
     { context                 = orderTaking
-    , workflow                = workflowContexts
-    , contextCommand          = Command.OrderTaking
-    , command                 = commandDomainType
-    , contextEvent            = Event.OrderTaking
-    , eventData               = eventDomainType
-    , contextError            = Error.OrderTaking
-    , errorData               = errorDomainType
-    , workflowMonad           = workflowMonad
-    , workflowMonadInstance   = workflowMonadInstance
+    , Workflow                = workflowContexts
+    , ContextCommand          = Command.OrderTaking
+    , Command                 = commandDomainType
+    , ContextEvent            = Event.OrderTaking
+    , EventData               = eventDomainType
+    , ContextError            = Error.OrderTaking
+    , ErrorData               = errorDomainType
+    , WorkflowMonad           = workflowMonad
+    , WorkflowMonadInstance   = workflowMonadInstance
     , workflowMorphism        = workflowMorphism
     , createWorkflowEmbedding = createWorkflowEmbedding
     , createWorkflowEvent     = createWorkflowEvent
