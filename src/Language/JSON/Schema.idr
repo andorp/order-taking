@@ -7,7 +7,6 @@ import Data.List
 
 namespace Schema
 
-
     public export
     Field : Type
 

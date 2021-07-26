@@ -136,7 +136,7 @@ data Query : Type where
   Select
     :  (  fields    : List FieldName)
     -> (  table     : Table)
-    -> (  okFields  : SelectedFieldsDefinedInTable fields table.fields)
+    -> (1 okFields  : SelectedFieldsDefinedInTable fields table.fields)
     => (  filters   : List (FieldName, String, String))
     -> (0 okFilters : FilteredFieldsDefinedInTable filters table.fields)
     => Query
