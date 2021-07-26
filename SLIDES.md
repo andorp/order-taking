@@ -378,10 +378,10 @@ morph r w = ...
 ╎ │ Place Order Database Monads  │ ╎
 ╎ └──────────────────────────────┘ ╎
 ╎ ┌──────────────────────────────┐ ╎
-╎ │     NodeJS Promise Monad     │ ╎
+╎ │        Runtime Monad         │ ╎ - NodeJS Promise
 ╎ └──────────────────────────────┘ ╎
 ╎ ┌──────────────────────────────┐ ╎
-╎ │        NodeJS Runtime        │ ╎
+╎ │          Tech stack          │ ╎ - NodeJS Runtime
 ╎ └──────────────────────────────┘ ╎
 └−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−┘
 ```
@@ -405,13 +405,13 @@ record BoundedContext where
 ```idris
 boundedContext
   :  (Monad m)
-  => (bc : BoundedContextImplementation m) -> bc.contextCommand -> m (Either bc.contextError bc.contextEvent)
+  => (bc : BoundedContextImplementation m) -> bc.ContextCommand -> m (Either bc.ContextError bc.ContextEvent)
 boundedContext bc contextCommand = do
   (cmd ** cmdData) <- bc.createCommand contextCommand
   workflowRunner <- bc.createWorkflowEmbedding cmd
-  let workflowMonadInstance = bc.workflowMonadInstance (bc.context.workflowOf cmd) -- For transformWorkflow
+  let workflowMonadInstance = bc.WorkflowMonadInstance (bc.context.workflowOf cmd) -- For transformWorkflow
   input  <- bc.createStartState cmd cmdData
-  result <- runEmbedding workflowRunner (transformWorkflow (bc.workflow (bc.context.workflowOf cmd)) (bc.workflowMorphism cmd) input)
+  result <- runEmbedding workflowRunner (transformWorkflow (bc.Workflow (bc.context.workflowOf cmd)) (bc.workflowMorphism cmd) input)
   case result of
     Left err => map Left (bc.createFinalError (bc.context.workflowOf cmd) err)
     Right wfVal => do
@@ -507,56 +507,56 @@ record BoundedContextImplementation (monad : Type -> Type) where
   constructor MkBoundedContextImplementation
   context
     : BoundedContext
-  workflow
-    : context.workflow -> WorkflowEnv
-  contextCommand
+  Workflow
+    : context.Workflow -> WorkflowEnv
+  ContextCommand
     : Type
-  command
-    : context.command -> Type
-  contextEvent
+  Command
+    : context.Command -> Type
+  ContextEvent
     : Type
-  eventData
-    : context.event -> Type
-  contextError
+  EventData
+    : context.Event -> Type
+  ContextError
     : Type
-  errorData
-    : context.workflow -> Type
-  workflowMonad
-    : context.workflow -> (Type -> Type)
-  workflowMonadInstance
-    : (w : context.workflow) -> Monad (workflowMonad w)
+  ErrorData
+    : context.Workflow -> Type
+  WorkflowMonad
+    : context.Workflow -> (Type -> Type)
+  WorkflowMonadInstance
+    : (w : context.Workflow) -> Monad (WorkflowMonad w)
   workflowMorphism
-    : (cmd : context.command) ->
+    : (cmd : context.Command) ->
       let w = context.workflowOf cmd
-          d = workflow w
-      in Morphism (workflowMonad w) (state d) (WorkflowEnv.command d) (branch d)
+          d = Workflow w
+      in Morphism (WorkflowMonad w) (State d) (WorkflowEnv.Command d) (Branch d)
   createWorkflowEmbedding
-    : (cmd : context.command) ->
+    : (cmd : context.Command) ->
       let w = context.workflowOf cmd
-      in monad (Embedding (workflowMonad w) (errorData w) monad)
+      in monad (Embedding (WorkflowMonad w) (ErrorData w) monad)
   createWorkflowEvent
-    : (cmd : context.command) ->
+    : (cmd : context.Command) ->
       let m = workflowMorphism cmd
-      in m.StateType (WorkflowEnv.end (workflow (context.workflowOf cmd))) -> monad (eventData (context.eventOf cmd))
+      in m.StateType (WorkflowEnv.end (Workflow (context.workflowOf cmd))) -> monad (EventData (context.eventOf cmd))
   createFinalEvent
-    : (cmd : context.command) -> eventData (context.eventOf cmd) -> monad contextEvent
+    : (cmd : context.Command) -> EventData (context.eventOf cmd) -> monad ContextEvent
   createCommand
-    : contextCommand -> monad (cmd : context.command ** command cmd)
+    : ContextCommand -> monad (cmd : context.Command ** Command cmd)
   createStartState
-    : (cmd : context.command) -> command cmd -> 
+    : (cmd : context.Command) -> Command cmd -> 
       let m = workflowMorphism cmd
-      in monad (m.StateType (WorkflowEnv.start (workflow (context.workflowOf cmd))))
+      in monad (m.StateType (WorkflowEnv.start (Workflow (context.workflowOf cmd))))
   createFinalError
-    : (w : context.workflow) -> (errorData w) -> monad contextError
+    : (w : context.Workflow) -> (ErrorData w) -> monad ContextError
 ```
 
 Even encapsulate Monad instances
 
 ```idris
-  workflowMonad
-    : context.workflow -> (Type -> Type)
-  workflowMonadInstance
-    : (w : context.workflow) -> Monad (workflowMonad w)
+  WorkflowMonad
+    : context.Workflow -> (Type -> Type)
+  WorkflowMonadInstance
+    : (w : context.Workflow) -> Monad (WorkflowMonad w)
 ```
 
 ### Free Monadic DSL of a workflow
@@ -698,4 +698,147 @@ createWorkflowEmbedding PlaceOrder = do
   pure $ MkEmbedding (\type, x => map (the (Either PlaceOrderError type)) (runBackend rb (interpret backend x)))
 ```
 
-### TODO: More slides ...
+### Type safe SQL commands
+
+```idris
+record Table where
+  constructor MkTable
+  name         : TableName
+  fields       : List Field
+  constraints  : List Constraint
+  0 validTable : ValidTable fields constraints
+```
+
+```idris
+-- Leaves out autoincrement fields
+InsertValues : List Field -> List Type
+
+data Command : Type where
+  CreateTable
+    :  (table : Table)
+    -> Command
+  Insert
+    :  (table : Table)
+    -> (values : HList (InsertValues table.fields))
+    -> Command
+```
+
+```idris
+productTable = MkTable
+  "product"
+  [ field "id"          SQL_Integer [PrimaryKey, AutoIncrement]
+  , field "code"        SQL_Text    [NotNull]
+  , field "description" SQL_Text    [NotNull]
+  , field "price"       SQL_Double  [NotNull]
+  ]
+  [ Unique "code_unique" ["code"] ]
+  YesOfCourseValid
+```
+
+```idris
+Insert productTable
+  [ FieldOf "code"        (SQLText productCode)
+  , FieldOf "description" (SQLText description)
+  , FieldOf "price"       (SQLDouble price)
+  ]
+```
+
+### Type safe SQL queries
+
+```idris
+data Query : Type where
+  Select
+    :  (  fields    : List FieldName)
+    -> (  table     : Table)
+    -> (1 okFields  : SelectedFieldsDefinedInTable fields table.fields)
+    => (  filters   : List (FieldName, String, String))
+    -> (0 okFilters : FilteredFieldsDefinedInTable filters table.fields)
+```
+
+```idris
+Select ["code", "description", "price"] productTable [("code", "=", "'\{productCode}'")]
+```
+
+### JSON with schema
+
+```idris
+data Presence = Optional | Required
+
+data Schema
+  = Null
+  | Boolean
+  | Number
+  | Str
+  | Array  (List Schema)
+  | Object (String, Presence, Schema)
+  | Either Schema Schema
+```
+
+```idris
+data Field : (String, Presence, Schema) -> Type where
+  RequiredField : {f : String} ->         JSON s -> Field (f,Required,s)
+  OptionalField : {f : String} -> Maybe (JSON s) -> Field (f,Optional,s)
+```
+
+```idris
+data JSON : Schema -> Type where
+  JNull    :                                        JSON Null
+  JBoolean : Bool                                -> JSON Boolean
+  JNumber  : Double                              -> JSON Number
+  JString  : String                              -> JSON Str
+  JArray   : {xs : List Schema}  -> All JSON xs  -> JSON (Array xs)
+  JObject  : {xs : FieldList}    -> All Field xs -> JSON (Object xs)
+  JLeft    : {l  : Schema}       -> JSON l       -> JSON (Either l r)
+  JRight   : {r  : Schema}       -> JSON r       -> JSON (Either l r)
+```
+
+### Postfix notation for OO feel
+
+```idris
+(.setHeader)     : Response -> String -> String -> IO ()
+(.setStatusCode) : Response -> Int              -> IO ()
+(.end)           : Response -> String           -> IO ()
+
+rsp.setHeader "Content-Type" "application/json"
+rsp.setHeader "Access-Control-Allow-Origin" "*"
+rsp.setStatusCode 400
+rsp.end "{\"message\":\"Couldn't parse incoming JSON.\"}"
+```
+
+### Dynamically typed programming
+
+Idris as strong that it can simulate JavaScript dynamic types, with matching on Types.
+
+```idris
+renderFieldValue : {t : Type} -> t -> String
+renderFieldValue {t=FieldOfTy n s} (FieldOf _ x) = renderFieldValue x
+renderFieldValue {t=Maybe (SQLValue s)} (Just x) = renderFieldValue x
+renderFieldValue {t=Maybe (SQLValue s)} Nothing  = "NULL"
+renderFieldValue {t=SQLValue s} x = renderSQLValue x
+renderFieldValue _ = "(╯°□°)╯︵ ┻━┻" -- This shouldn't happen
+
+renderInsertNames : List Field -> List String
+
+renderCommand (Insert table values)
+  = "INSERT INTO \{table.name} (\{withCommas (renderInsertNames table.fields)}) VALUES (\{withCommas (renderInsertValues values)})"
+```
+
+Forget this line:
+```idris
+renderFieldValue {t=FieldOfTy n s} (FieldOf _ x) = renderFieldValue x
+```
+
+```idris
+Insert productTable
+  [ FieldOf "code"        (SQLText productCode)
+  , FieldOf "description" (SQLText description)
+  , FieldOf "price"       (SQLDouble price)
+  ]
+```
+
+and got this in the logs:
+```
+INSERT INTO productTable (...) VALUES ((╯°□°)╯︵ ┻━┻, (╯°□°)╯︵ ┻━┻, (╯°□°)╯︵ ┻━┻)
+```
+
+## QED
