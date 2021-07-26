@@ -309,7 +309,7 @@ Explicit connection between high level definition of the workflow and its implem
 The implementation of the workflow, is a function from the high level description of the workflow to a monadic state transition, via
 the `morph` helper function:
 
-```
+```idris
 placeOrder : Workflow Transition Check OrderForm OrderInfo
 placeOrder = do
   Do ValidateOrder
@@ -320,7 +320,7 @@ placeOrder = do
         Do SendAckToCustomer)
 ```
 
-```
+```idris
 record Morphism (monad : Type -> Type) state (cmd : state -> state -> Type) (chk : state -> state -> state -> Type)
   where
     constructor MkMorphism
@@ -329,7 +329,7 @@ record Morphism (monad : Type -> Type) state (cmd : state -> state -> Type) (chk
     check     : chk s b1 b2 -> (StateType s) -> monad (Either (StateType b1) (StateType b2))
 ```
 
-```
+```idris
 morph
   ...
   -> (r : Morphism monad state cmd chk)
@@ -440,5 +440,240 @@ boundedContext bc contextCommand = do
   Make run everything with event driven approach of NodeJS.
 - [NodeJS Runtime](https://github.com/andorp/order-taking/tree/main/src/Service/NodeJS)  
   Use third party libraries, such as HTTP, SQLite
+
+## Dependent types in Action
+
+Tools of dependently typed programming and their use in software.
+
+Examples here are in pseudo Idris; quantities, correct implicit parameters are omitted.
+
+### Extrinsic state transitions (mapping)
+
+```idris
+data Workflow
+      :  (cmd : state -> state -> Type)
+      -> (chk : state -> state -> state -> Type)
+      -> state
+      -> state
+      -> Type
+  where
+    Do : cmd pre post -> Workflow cmd chk pre post
+    Branch : chk pre branch1 branch2
+           -> Workflow cmd chk branch1 post
+           -> Workflow cmd chk branch2 post
+           -> Workflow cmd chk pre post
+    (>>)
+      :  Workflow cmd chk pre mid
+      -> Workflow cmd chk mid post
+      -> Workflow cmd chk pre post
+```
+
+```idris
+record Morphism (monad : Type -> Type) state (cmd : state -> state -> Type) (chk : state -> state -> state -> Type)
+  where
+    constructor MkMorphism
+    StateType : state -> Type
+    command   : cmd s e -> (StateType s) -> monad (StateType e)
+    check     : chk s b1 b2 -> (StateType s) -> monad (Either (StateType b1) (StateType b2))
+```
+
+```idris
+morph
+  ...
+  -> (r : Morphism monad state cmd chk)
+  -> Workflow cmd chk start end
+  -> (StateType r start) -> monad (StateType r end)
+morph r w = ...
+```
+
+### Bounded Context Implementation
+
+Encapsulation of types in records
+
+```idris
+record BoundedContext where
+  constructor MkBoundedContext
+  command     : Type
+  workflow    : Type
+  event       : Type
+  workflowOf  : command -> workflow
+  eventOf     : command -> event
+```
+
+Pieces of the workflow puzzle; a type safe approach
+
+```idris
+record BoundedContextImplementation (monad : Type -> Type) where
+  constructor MkBoundedContextImplementation
+  context
+    : BoundedContext
+  workflow
+    : context.workflow -> WorkflowEnv
+  contextCommand
+    : Type
+  command
+    : context.command -> Type
+  contextEvent
+    : Type
+  eventData
+    : context.event -> Type
+  contextError
+    : Type
+  errorData
+    : context.workflow -> Type
+  workflowMonad
+    : context.workflow -> (Type -> Type)
+  workflowMonadInstance
+    : (w : context.workflow) -> Monad (workflowMonad w)
+  workflowMorphism
+    : (cmd : context.command) ->
+      let w = context.workflowOf cmd
+          d = workflow w
+      in Morphism (workflowMonad w) (state d) (WorkflowEnv.command d) (branch d)
+  createWorkflowEmbedding
+    : (cmd : context.command) ->
+      let w = context.workflowOf cmd
+      in monad (Embedding (workflowMonad w) (errorData w) monad)
+  createWorkflowEvent
+    : (cmd : context.command) ->
+      let m = workflowMorphism cmd
+      in m.StateType (WorkflowEnv.end (workflow (context.workflowOf cmd))) -> monad (eventData (context.eventOf cmd))
+  createFinalEvent
+    : (cmd : context.command) -> eventData (context.eventOf cmd) -> monad contextEvent
+  createCommand
+    : contextCommand -> monad (cmd : context.command ** command cmd)
+  createStartState
+    : (cmd : context.command) -> command cmd -> 
+      let m = workflowMorphism cmd
+      in monad (m.StateType (WorkflowEnv.start (workflow (context.workflowOf cmd))))
+  createFinalError
+    : (w : context.workflow) -> (errorData w) -> monad contextError
+```
+
+Even encapsulate Monad instances
+
+```idris
+...
+  workflowMonad
+    : context.workflow -> (Type -> Type)
+  workflowMonadInstance
+    : (w : context.workflow) -> Monad (workflowMonad w)
+...
+```
+
+### Free Monadic DSL of a workflow
+
+```idris
+data PlaceOrderDSL : Type -> Type where
+  Pure : a -> PlaceOrderDSL a
+  Bind : PlaceOrderDSL a -> Inf (a -> PlaceOrderDSL b) -> PlaceOrderDSL b
+
+  ThrowError : (a : Type) -> PlaceOrderError -> PlaceOrderDSL a
+  CatchError : {a : Type} -> PlaceOrderDSL a -> PlaceOrderDSL (Either PlaceOrderError a)
+
+  NewOrderId : PlaceOrderDSL OrderId
+  NewOrderLineId : PlaceOrderDSL OrderLineId
+
+  CheckProductCodeExists : ProductCode -> PlaceOrderDSL Bool
+  CheckAddressExists     : AddressForm -> PlaceOrderDSL (Either CheckedAddressValidationError CheckedAddress)
+
+  GetProductPrice  : ProductCode -> PlaceOrderDSL Price
+  PlacePricedOrder : PricedOrder -> PlaceOrderDSL ()
+
+  CreateOrderAcknowledgementLetter : PricedOrder          -> PlaceOrderDSL HtmlString
+  SendOrderAcknowledgement         : OrderAcknowledgement -> PlaceOrderDSL AckSent
+```
+
+```idris
+record Model (m : Type -> Type) where
+  constructor MkModel
+  throwError
+    : {a : Type} -> PlaceOrderError -> m a
+  catchError
+    : {a : Type} -> m a -> m (Either PlaceOrderError a)
+  newOrderId
+    : m OrderId
+  newOrderLineId
+    : m OrderLineId
+  checkProductCodeExists
+    : ProductCode -> m Bool
+  checkAddressExists
+    : AddressForm -> m (Either CheckedAddressValidationError CheckedAddress)
+  getProductPrice
+    : ProductCode -> m Price
+  placePricedOrder
+    : PricedOrder -> m ()
+  createOrderAcknowledgementLetter
+    : PricedOrder -> m HtmlString
+  sendOrderAcknowledgement
+    : OrderAcknowledgement -> m AckSent
+```
+
+NOTE: Even datatypes could be abstracted, but here that was not necesary.
+
+### Components
+
+Type-safe non-leaky abstraction of components; everything is closed with dependent records.
+
+```idris
+record EmailComp where
+  constructor MkEmailComp
+  emailError  : Type
+  showError   : emailError -> String
+  serviceInfo : ServiceInfo
+  send        : EmailAddress -> HtmlString -> Promise (Maybe emailError)
+```
+
+```idris
+record OrderDBComp where
+  constructor MkOrderDBComp
+  dbConnection        : Type 
+  dbError             : Type
+  showDBError         : dbError -> String
+  initConnection      : Promise (Either dbError dbConnection)
+  closeConnection     : dbConnection -> Promise (Maybe dbError)
+  beginTransaction    : dbConnection -> Promise (Maybe dbError)
+  commitTransaction   : dbConnection -> Promise (Maybe dbError)
+  rollbackTransaction : dbConnection -> Promise (Maybe dbError)
+  saveOrder           : dbConnection -> PricedOrderDTO -> Promise (Maybe dbError)
+```
+
+### Dependency injection with implicit parameters
+
+```idris
+record Dependencies where
+  constructor MkDependencies
+  md5Provider       : MD5
+  orderDBComp       : OrderDBComp
+  orderDBConn       : orderDBComp.dbConnection
+  productDBComp     : ProductDBComp
+  productDBConn     : productDBComp.dbConnection
+  emailComp         : EmailComp
+  checkAddressComp  : CheckAddressComp
+```
+
+```idris
+mkRunBackend
+  :  (orderDBComp       : OrderDBComp)
+  => (productDBComp     : ProductDBComp)
+  => (emailComp         : EmailComp)
+  => (checkAddressComp  : CheckAddressComp)
+  => HasIO io
+  => io RunBackend
+mkRunBackend = ...
+```
+
+```
+  createWorkflowEmbedding
+    :  (cmd : Command)
+    -> Promise (Embedding (workflowMonad (workflowOf cmd)) (errorDomainType (workflowOf cmd)) Promise)
+  createWorkflowEmbedding PlaceOrder = do
+    let orderDBComp       = orderDBSQLite
+    let productDBComp     = productDBSQlite
+    let emailComp         = noEmail
+    let checkAddressComp  = okCheckAddress
+    rb <- mkRunBackend
+    pure $ MkEmbedding (\type, x => map (the (Either PlaceOrderError type)) (runBackend rb (interpret backend x)))
+```
 
 ### TODO: More slides ...
