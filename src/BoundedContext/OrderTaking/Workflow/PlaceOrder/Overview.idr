@@ -32,7 +32,7 @@ import Rango.BoundedContext.Workflow
 --   │                                               │ Queue
 --   │                                               ▼
 --   │                                             ┌────────────────────────────┐
---   │                                             │     InvalidOrderQeued      │
+--   │                                             │     InvalidOrderQueued     │
 --   │                                             └────────────────────────────┘
 --   │                                               │
 --   │                                               │ Create invalid order info
@@ -111,11 +111,11 @@ workflow = do
 -- Graph Source:
 -- 
 -- digraph {
---  OrderForm         -> Order [label="Validate Order"];
---  InvalidOrder      -> InvalidOrderQeued [label="Queue"];
---  ValidOrder        -> PricedOrder [label="Price"]; 
---  PricedOrder       -> OrderInfo [label="Create priced order info"];
---  InvalidOrderQeued -> OrderInfo [label="Create invalid order info"];
+--  OrderForm          -> Order [label="Validate Order"];
+--  InvalidOrder       -> InvalidOrderQueued [label="Queue"];
+--  ValidOrder         -> PricedOrder [label="Price"]; 
+--  PricedOrder        -> OrderInfo [label="Create priced order info"];
+--  InvalidOrderQueued -> OrderInfo [label="Create invalid order info"];
 --
 --  Order -> ValidOrder   [label="Create valid"];
 --  Order -> InvalidOrder [label="Create invalid"];

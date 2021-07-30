@@ -25,7 +25,7 @@ import BoundedContext.OrderTaking.Workflow.PlaceOrder.Database.Product
 -- entry point for the real abstraction.
 
 handleCommand : Command.OrderTaking -> Promise (Either Error.OrderTaking Event.OrderTaking)
-handleCommand = boundedContext orderTakingContext
+handleCommand = BoundedContext.execute orderTakingContext
 
 -- Scaffolding of getting the JSON and the Command out of the request, execute the command in
 -- the OrderTaking Bounded Context and render the result JSON from the Event data coming

@@ -107,7 +107,7 @@ export
 runEmbedding : {a : Type} -> Embedding f e t -> f a -> t (Either e a)
 runEmbedding (MkEmbedding f) y = f a y
 
-||| The implementation of the Bounded Context
+||| Well-typed formulazation of a Bounded Context.
 public export
 record BoundedContextImplementation (monad : Type -> Type) where
   constructor MkBoundedContextImplementation
@@ -179,11 +179,17 @@ record BoundedContextImplementation (monad : Type -> Type) where
   createFinalError
     : (w : context.Workflow) -> (ErrorData w) -> monad ContextError
 
+||| Execute a command with the given bounded context.
+|||
+||| Its responsibility is to select the workflow corresponding the given command,
+||| and execute the selected workflow in its monad, which is embeddeable to the
+||| main monad of the bounded context handler. The result will be a bounded context
+||| error or a bounded context event.
 export
-boundedContext
+execute
   :  (Monad m)
   => (bc : BoundedContextImplementation m) -> bc.ContextCommand -> m (Either bc.ContextError bc.ContextEvent)
-boundedContext bc contextCommand = do
+execute bc contextCommand = do
   (cmd ** cmdData) <- bc.createCommand contextCommand
   workflowRunner <- bc.createWorkflowEmbedding cmd
   let workflowMonadInstance = bc.WorkflowMonadInstance (bc.context.workflowOf cmd) -- For transformWorkflow
