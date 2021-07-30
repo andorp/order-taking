@@ -21,7 +21,7 @@ data Workflow
       -> state
       -> Type
   where
-    -- Wrap a command in a Do step
+    -- Wrap a step in a Do step
     Do
       :  {0 cmd : state -> state -> Type}
       -> cmd pre post
@@ -55,9 +55,9 @@ record Morphism
     -- How to represent information with the associated state.
     StateType
       : state -> Type
-    -- How to represent the given command as a monadic state transition,
+    -- How to represent the given step as a monadic state transition,
     -- in form of 'a -> m b'
-    command
+    step
       : {0 s,e : state} -> cmd s e -> (StateType s) -> monad (StateType e)
     -- How to represent branching as a monadic state transition,
     -- in form of 'a -> m (Either b c)'
@@ -76,7 +76,7 @@ morph
   => (r : Morphism monad state cmd chk)
   -> Workflow cmd chk start end
   -> (StateType r start) -> monad (StateType r end)
-morph r (Do cmd) i = command r cmd i
+morph r (Do cmd) i = step r cmd i
 morph r (m1 >> m2) i = do
   x <- morph r m1 i
   morph r m2 x

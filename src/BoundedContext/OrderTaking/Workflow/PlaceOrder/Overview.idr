@@ -75,14 +75,14 @@ data Check : State -> State -> State -> Type where
 
 ||| State transition of the OrderTaking workflow.
 public export
-data Transition : State -> State -> Type where
-  ValidateOrder     : Transition OrderForm           Order
-  AddInvalidOrder   : Transition InvalidOrder        InvalidOrderQueued
-  PriceOrder        : Transition ValidOrder          PricedOrder
-  SendAckToCustomer : Transition PricedOrder         OrderInfo
-  SendInvalidOrder  : Transition InvalidOrderQueued  OrderInfo
+data Step : State -> State -> Type where
+  ValidateOrder     : Step OrderForm           Order
+  AddInvalidOrder   : Step InvalidOrder        InvalidOrderQueued
+  PriceOrder        : Step ValidOrder          PricedOrder
+  SendAckToCustomer : Step PricedOrder         OrderInfo
+  SendInvalidOrder  : Step InvalidOrderQueued  OrderInfo
 
--- The Transition is another indexed datatype, with two indices of State values.
+-- The Step is another indexed datatype, with two indices of State values.
 
 ||| Workflow definiton of the state transition system.
 |||
@@ -92,7 +92,7 @@ data Transition : State -> State -> Type where
 ||| registers it as an invalid order. In both cases it sends
 ||| information about that state of the order to the customer
 public export
-workflow : Workflow Transition Check OrderForm OrderInfo
+workflow : Workflow Step Check OrderForm OrderInfo
 workflow = do
   Do ValidateOrder
   Branch CheckInvalidOrder
