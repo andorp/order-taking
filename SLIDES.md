@@ -547,7 +547,7 @@ morph r w = ...
 
 ### Example of workflow morphism
 
-```
+```idris
 StateType : Overview.State -> Type
 StateType OrderForm          = Domain.OrderForm
 StateType Order              = Either Domain.InvalidOrder Domain.Order
