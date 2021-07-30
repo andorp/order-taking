@@ -654,7 +654,7 @@ Even encapsulate Monad instances
 
 ### Example of workflow morphism (again)
 
-```
+```idris
 StateType : Overview.State -> Type
 StateType OrderForm          = Domain.OrderForm
 StateType Order              = Either Domain.InvalidOrder Domain.Order
