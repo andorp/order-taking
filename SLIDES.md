@@ -131,7 +131,7 @@
 ╎ │       Detailed design       │ ╎
 ╎ └─────────────────────────────┘ ╎
 ╎ ┌─────────────────────────────┐ ╎
-╎ │  Data / Behavior definition │ ╎ ◀─ Change should propagete up and down
+╎ │  Data / Behavior definition │ ╎ ◀─ Change should propagate up and down
 ╎ └─────────────────────────────┘ ╎
 ╎ ┌─────────────────────────────┐ ╎
 ╎ │        Implementation       │ ╎
@@ -245,7 +245,7 @@ For example
 ╎   │                                  │ Queue                      ╎
 ╎   │                                  ▼                            ╎
 ╎   │                                ┌────────────────────────────┐ ╎
-╎   │                                |     InvalidOrderQeued      │ ╎
+╎   │                                |     InvalidOrderQueued     │ ╎
 ╎   │                                └────────────────────────────┘ ╎
 ╎   │                                  │                            ╎
 ╎   │                                  │ Create invalid order info  ╎
@@ -334,7 +334,7 @@ one layer, will propagate through the semantic tower.
 ╎   │                            ╎
 ╎   ▼                            ╎
 ╎ ┌────────────────────────────┐ ╎
-╎ │ Data / Behavior definition │ ╎ ◀─ Change *will* propagete up and down
+╎ │ Data / Behavior definition │ ╎ ◀─ Change *will* propagate up and down
 ╎ └────────────────────────────┘ ╎
 ╎   │                            ╎
 ╎   ▼                            ╎
@@ -462,10 +462,11 @@ record BoundedContext where
 [Source](https://github.com/andorp/order-taking/blob/main/src/Rango/BoundedContext/BoundedContext.idr#L183)
 
 ```idris
-boundedContext
+||| Execute a command with the given bounded context.
+execute
   :  (Monad m)
   => (bc : BoundedContextImplementation m) -> bc.ContextCommand -> m (Either bc.ContextError bc.ContextEvent)
-boundedContext bc contextCommand = do
+execute bc contextCommand = do
   (cmd ** cmdData) <- bc.createCommand contextCommand
   workflowRunner <- bc.createWorkflowEmbedding cmd
   let workflowMonadInstance = bc.WorkflowMonadInstance (bc.context.workflowOf cmd) -- For transformWorkflow
@@ -480,7 +481,7 @@ boundedContext bc contextCommand = do
 
 - Bounded Context computation lives in its monad
 - Every workflow has its own monad, which must be embeddable to the monad of the bounded context
-- Note the dependentt pair and its use `(cmd ** cmdData) <- bc.createCommand contextCommand`
+- Note the dependent pair and its use `(cmd ** cmdData) <- bc.createCommand contextCommand`
 
 ### Full architecture, explained
 
