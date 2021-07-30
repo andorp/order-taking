@@ -256,7 +256,64 @@ For example
 └−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−┘
 ```
 
-### The missing link of the semantic tower
+### Information flow
+
+In a service implementation information is processed via information flow
+from Request to Response. In the Bounded Context of DDD this workflow
+looks like this:
+
+```
+┌−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−┐
+╎      Request/Response flow in bounded context           ╎
+╎                                                         ╎
+╎            ┌─────────────────────┐                      ╎
+╎            │       Request       │                      ╎
+╎            └─────────────────────┘                      ╎
+╎              ▼                                          ╎
+╎            ┌─────────────────────┐                      ╎
+╎            │        JSON         │                      ╎
+╎            └─────────────────────┘                      ╎
+╎              ▼                                          ╎
+╎            ┌─────────────────────┐                      ╎
+╎            │    Command Data     │                      ╎
+╎            └─────────────────────┘                      ╎
+╎              ▼                                          ╎
+╎            ┌─────────────────────┐                      ╎
+╎            │       Command       │                      ╎
+╎            └─────────────────────┘                      ╎
+╎              ▼                                          ╎
+╎            ┌─────────────────────┐                      ╎
+╎            │   Workflow Input    │                      ╎
+╎            └─────────────────────┘                      ╎
+╎                ▼                                        ╎
+╎ ┌────┐       ┌─────────────────────┐       ┌──────────┐ ╎
+╎ │ DB │ ───── │ Workflow Internals  │ ───── │ Services │ ╎
+╎ └────┘       └─────────────────────┘       └──────────┘ ╎
+╎              ▼                                          ╎
+╎            ┌─────────────────────┐                      ╎
+╎            │   Workflow Output   │                      ╎
+╎            └─────────────────────┘                      ╎
+╎              ▼                                          ╎
+╎            ┌─────────────────────┐                      ╎
+╎            │        Event        │                      ╎
+╎            └─────────────────────┘                      ╎
+╎              ▼                                          ╎
+╎            ┌─────────────────────┐                      ╎
+╎            │     Event Data      │                      ╎
+╎            └─────────────────────┘                      ╎
+╎              ▼                                          ╎
+╎            ┌─────────────────────┐                      ╎
+╎            │        JSON         │                      ╎
+╎            └─────────────────────┘                      ╎
+╎              ▼                                          ╎
+╎            ┌─────────────────────┐                      ╎
+╎            │      Response       │                      ╎
+╎            └─────────────────────┘                      ╎
+└−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−┘
+
+```
+
+### The missing link in the semantic tower
 
 Layers may depend on each other. With dependent types we can express this connection.
 If layer n of the semantic tower is a function of layer n-1 than any change in
@@ -310,7 +367,7 @@ The implementation of the workflow, is a function from the high level descriptio
 the `morph` helper function:
 
 ```idris
-placeOrder : Workflow Transition Check OrderForm OrderInfo
+placeOrder : Workflow Step Check OrderForm OrderInfo
 placeOrder = do
   Do ValidateOrder
   Branch CheckInvalidOrder
@@ -325,7 +382,7 @@ record Morphism (monad : Type -> Type) state (cmd : state -> state -> Type) (chk
   where
     constructor MkMorphism
     StateType : state -> Type
-    command   : cmd s e -> (StateType s) -> monad (StateType e)
+    step      : cmd s e -> (StateType s) -> monad (StateType e)
     check     : chk s b1 b2 -> (StateType s) -> monad (Either (StateType b1) (StateType b2))
 ```
 
@@ -385,6 +442,8 @@ morph r w = ...
 ╎ └──────────────────────────────┘ ╎
 └−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−┘
 ```
+
+### Information flow
 
 ### Bounded Context implementation
 
@@ -486,6 +545,40 @@ morph
 morph r w = ...
 ```
 
+### Example of workflow morphism
+
+```
+StateType : Overview.State -> Type
+StateType OrderForm          = Domain.OrderForm
+StateType Order              = Either Domain.InvalidOrder Domain.Order
+StateType ValidOrder         = Domain.Order
+StateType PricedOrder        = Domain.PricedOrder
+StateType InvalidOrder       = Domain.InvalidOrder
+StateType InvalidOrderQueued = List Domain.PlacedOrderEvent
+StateType OrderInfo          = List Domain.PlacedOrderEvent
+
+step : Overview.Step s e -> (StateType s) -> PlaceOrderDSL (StateType e)
+step ValidateOrder     st = validateOrder st
+step AddInvalidOrder   st = pure [InvalidOrderRegistered st]
+step PriceOrder        st = priceOrder st
+step SendAckToCustomer st = do
+  ack <- acknowledgeOrder st
+  placePricedOrder st
+  pure $ createEvents st ack
+step SendInvalidOrder  st = pure st
+
+check : Check s b1 b2 -> (StateType s) -> PlaceOrderDSL (Either (StateType b1) (StateType b2))
+check CheckInvalidOrder st = pure st
+
+public export
+PlaceOrderMorphism : Morphism PlaceOrderDSL Overview.State Overview.Step Overview.Check
+PlaceOrderMorphism = MkMorphism
+  { StateType = StateType
+  , step      = step
+  , check     = check
+  }
+```
+
 ### Bounded Context Implementation
 
 Encapsulation of types in records
@@ -557,6 +650,40 @@ Even encapsulate Monad instances
     : context.Workflow -> (Type -> Type)
   WorkflowMonadInstance
     : (w : context.Workflow) -> Monad (WorkflowMonad w)
+```
+
+### Example of workflow morphism (again)
+
+```
+StateType : Overview.State -> Type
+StateType OrderForm          = Domain.OrderForm
+StateType Order              = Either Domain.InvalidOrder Domain.Order
+StateType ValidOrder         = Domain.Order
+StateType PricedOrder        = Domain.PricedOrder
+StateType InvalidOrder       = Domain.InvalidOrder
+StateType InvalidOrderQueued = List Domain.PlacedOrderEvent
+StateType OrderInfo          = List Domain.PlacedOrderEvent
+
+step : Overview.Step s e -> (StateType s) -> PlaceOrderDSL (StateType e)
+step ValidateOrder     st = validateOrder st
+step AddInvalidOrder   st = pure [InvalidOrderRegistered st]
+step PriceOrder        st = priceOrder st
+step SendAckToCustomer st = do
+  ack <- acknowledgeOrder st
+  placePricedOrder st
+  pure $ createEvents st ack
+step SendInvalidOrder  st = pure st
+
+check : Check s b1 b2 -> (StateType s) -> PlaceOrderDSL (Either (StateType b1) (StateType b2))
+check CheckInvalidOrder st = pure st
+
+public export
+PlaceOrderMorphism : Morphism PlaceOrderDSL Overview.State Overview.Step Overview.Check
+PlaceOrderMorphism = MkMorphism
+  { StateType = StateType
+  , step      = step
+  , check     = check
+  }
 ```
 
 ### Free Monadic DSL of a workflow
