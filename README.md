@@ -28,6 +28,9 @@ of libraries from the NodeJS ecosystem almost for free. This approach would posi
 in production settings and the Idris userbase could be bootstrapped, later the Idris version of these
 libraries could be written.
 
+Request: Please consider buying both of the books mentioned above. Boths are excellent resources for
+further studying of the applied subject.
+
 ## Notes
 
 This project meant to be a blue-print, example for micro-services written in Idris. Its main focus is to reproduce
