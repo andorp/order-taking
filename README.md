@@ -50,6 +50,12 @@ a hand-book for Idris development.
 
 See the [slides](https://github.com/andorp/order-taking/blob/main/SLIDES.md)
 
+## Support
+
+<a href="https://www.patreon.com/AndOrP">
+<img src="https://c5.patreon.com/external/logo/become_a_patron_button.png" width="150"/>
+</a>
+
 ## Run
 
 After setted up; start the microservice with `make start-opt`, start the client service `npm run dev`,
