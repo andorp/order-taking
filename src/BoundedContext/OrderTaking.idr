@@ -51,24 +51,24 @@ namespace Implementation
     , eventOf     = eventOf
     }
 
-  commandDomainType : C.Command -> Type
-  commandDomainType PlaceOrder = OrderForm
+  WorkflowEntry : W.Workflow -> Type
+  WorkflowEntry PlaceOrder = OrderForm
 
-  eventDomainType : E.Event -> Type
-  eventDomainType PlaceOrder = List PlacedOrderEvent
+  EventDomainType : E.Event -> Type
+  EventDomainType PlaceOrder = List PlacedOrderEvent
 
   workflowContexts : W.Workflow -> WorkflowEnv
   workflowContexts PlaceOrder = mkWorkflowEnv PlaceOrder.Overview.workflow
 
-  workflowMonad : W.Workflow -> (Type -> Type)
-  workflowMonad PlaceOrder = PlaceOrderDSL
+  WorkflowMonad : W.Workflow -> (Type -> Type)
+  WorkflowMonad PlaceOrder = PlaceOrderDSL
 
-  errorDomainType : W.Workflow -> Type
-  errorDomainType PlaceOrder = PlaceOrderError
+  ErrorDomainType : W.Workflow -> Type
+  ErrorDomainType PlaceOrder = PlaceOrderError
 
   createWorkflowEmbedding
     :  (cmd : Command)
-    -> Promise (Embedding (workflowMonad (workflowOf cmd)) (errorDomainType (workflowOf cmd)) Promise)
+    -> Promise (Embedding (WorkflowMonad (workflowOf cmd)) (ErrorDomainType (workflowOf cmd)) Promise)
   createWorkflowEmbedding PlaceOrder = do
     let orderDBComp       = orderDBSQLite
     let productDBComp     = productDBSQlite
@@ -81,32 +81,36 @@ namespace Implementation
     :  (cmd : Command)
     -> let w = workflowOf cmd
        in Morphism
-            (workflowMonad w)
-            (WorkflowEnv.State (workflowContexts (w)))
+            (WorkflowMonad w)
+            (WorkflowEnv.state (workflowContexts (w)))
             (WorkflowEnv.Command (workflowContexts w))
             (WorkflowEnv.Branch (workflowContexts w))
   workflowMorphism PlaceOrder = PlaceOrderMorphism
  
-  createWorkflowEvent
+  transformWorkflowResult
     :  (cmd : Command)
     -> let m = workflowMorphism cmd
-       in m.StateType (WorkflowEnv.end (workflowContexts (workflowOf cmd))) -> Promise (eventDomainType (eventOf cmd))
-  createWorkflowEvent PlaceOrder x = pure x
+       in m.StateType (WorkflowEnv.end (workflowContexts (workflowOf cmd))) -> Promise (EventDomainType (eventOf cmd))
+  transformWorkflowResult PlaceOrder x = pure x
 
-  createFinalEvent : (cmd : Command) -> eventDomainType (eventOf cmd) -> Promise Event.OrderTaking
-  createFinalEvent PlaceOrder x = pure $ PlaceOrder x
+  transformEvent : (cmd : Command) -> EventDomainType (eventOf cmd) -> Promise Event.OrderTaking
+  transformEvent PlaceOrder x = pure $ PlaceOrder x
 
-  createCommand : Command.OrderTaking -> Promise (cmd : Command ** commandDomainType cmd)
+  createCommand : Command.OrderTaking -> Promise (cmd : Command ** WorkflowEntry (workflowOf cmd))
   createCommand (PlaceOrder x) = pure (PlaceOrder ** x)
 
-  createFinalError : (wf : Workflow) -> errorDomainType wf -> Promise Error.OrderTaking
-  createFinalError PlaceOrder x = pure (PlaceOrder x)
+  transformError
+    :  (wf : Workflow)
+    -> ErrorDomainType wf -> Promise Error.OrderTaking
+  transformError PlaceOrder x = pure (PlaceOrder x)
 
-  createStartState : (cmd : Command) -> commandDomainType cmd -> Promise ((workflowMorphism cmd).StateType ((workflowContexts (workflowOf cmd)).start))
+  createStartState
+    :  (cmd : Command)
+    -> WorkflowEntry (workflowOf cmd) -> Promise ((workflowMorphism cmd).StateType ((workflowContexts (workflowOf cmd)).start))
   createStartState PlaceOrder x = pure x
 
-  workflowMonadInstance : (w : Workflow) -> Monad (workflowMonad w)
-  workflowMonadInstance PlaceOrder = %search
+  WorkflowMonadInstance : (w : Workflow) -> Monad (WorkflowMonad w)
+  WorkflowMonadInstance PlaceOrder = %search
 
   public export
   orderTakingContext : BoundedContextImplementation Promise
@@ -114,18 +118,18 @@ namespace Implementation
     { context                 = orderTaking
     , Workflow                = workflowContexts
     , ContextCommand          = Command.OrderTaking
-    , Command                 = commandDomainType
+    , WorkflowEntry           = WorkflowEntry
     , ContextEvent            = Event.OrderTaking
-    , EventData               = eventDomainType
+    , EventData               = EventDomainType
     , ContextError            = Error.OrderTaking
-    , ErrorData               = errorDomainType
-    , WorkflowMonad           = workflowMonad
-    , WorkflowMonadInstance   = workflowMonadInstance
+    , ErrorData               = ErrorDomainType
+    , WorkflowMonad           = WorkflowMonad
+    , WorkflowMonadInstance   = WorkflowMonadInstance
     , workflowMorphism        = workflowMorphism
     , createWorkflowEmbedding = createWorkflowEmbedding
-    , createWorkflowEvent     = createWorkflowEvent
-    , createFinalEvent        = createFinalEvent
+    , transformWorkflowResult = transformWorkflowResult
+    , transformEvent          = transformEvent
     , createCommand           = createCommand
     , createStartState        = createStartState
-    , createFinalError        = createFinalError
+    , transformError          = transformError
     }

@@ -71,11 +71,11 @@ record BoundedContext where
 public export
 record WorkflowEnv where
   constructor MkWorkflowEnv
-  State    : Type
-  Command  : State -> State -> Type
-  Branch   : State -> State -> State -> Type
-  start    : State
-  end      : State
+  state    : Type
+  Command  : state -> state -> Type
+  Branch   : state -> state -> state -> Type
+  start    : state
+  end      : state
   Workflow : Workflow Command Branch start end
 
 ||| Smart constructor for the Workflow.
@@ -95,17 +95,30 @@ mkWorkflowEnv {st, cm, br, s, e} w = MkWorkflowEnv st cm br s e w
 transformWorkflow
   :  Monad monad
   => (w : WorkflowEnv)
-  -> (mr : Morphism monad w.State w.Command w.Branch)
+  -> (mr : Morphism monad w.state w.Command w.Branch)
   -> (mr.StateType w.start) -> monad (mr.StateType w.end)
 transformWorkflow w mr x = morph mr w.Workflow x
 
+||| Embedding of a workflow monad into the monad of bounded context implementation.
+|||
+||| The embedding encapsulates a function which transforms one monad to another one.
+||| This is a helper abstraction for the Workflow embedding, where workflow monads,
+||| needs to be understandable in the monad of the bounded context.
 public export
 data Embedding : (from : Type -> Type) -> (err : Type) -> (to : Type -> Type) -> Type where
+  -- An extra 'a' type parameter is needed here to support the Rank polimorphism
+  -- better. This type parameter will be injected with the 'runEmbedding' function.
+  -- The 'Either err' is part of the return type signature to encode the fact, that
+  -- some kind of error will be expected from the run of the workflow.
   MkEmbedding : ((a : Type) -> from a -> to (Either err a)) -> Embedding from err to
 
-export
-runEmbedding : {a : Type} -> Embedding f e t -> f a -> t (Either e a)
-runEmbedding (MkEmbedding f) y = f a y
+||| Unwraps the embedding
+|||
+||| unwrapEmbedding use the implicit 'a' type parameters from the context, which
+||| is determined by the clients of the 'unwrapEmbedding'.
+||| Its intended use is to create the 'f a -> t (Either e a)' function.
+unwrapEmbedding : {a : Type} -> Embedding f e t -> (f a -> t (Either e a))
+unwrapEmbedding (MkEmbedding f) y = f a y
 
 ||| Well-typed formulazation of a Bounded Context.
 public export
@@ -126,8 +139,8 @@ record BoundedContextImplementation (monad : Type -> Type) where
   
   ||| Association between the different kind of commands and the information
   ||| needed by the Workflow.
-  Command
-    : context.Command -> Type
+  WorkflowEntry
+    : context.Workflow -> Type
   
   ||| Datatype which represents an outgoing Event of the Bounded Context
   ||| It should somehow summarize the information from the events created
@@ -151,32 +164,75 @@ record BoundedContextImplementation (monad : Type -> Type) where
   ErrorData
     : context.Workflow -> Type
 
+  ||| For every workflow we can define its own monad, this helps us
+  ||| separate of concerns a granulated way. For example
+  ||| different workflows, needs to connect to different services
+  ||| or different databases. It is enough if the workflow monad
+  ||| just encapsulates its very own repsonsibility.
   WorkflowMonad
     : context.Workflow -> (Type -> Type)
+  
+  ||| Technicality, defining the Monad type for the workflow is not
+  ||| enough, we should provide its Monad interface instance. This
+  ||| is needed for the embedding part, when we select the Monad
+  ||| for the workflow Idris must be aware of the Monad instance
+  ||| in context. The easiest way to do this is the grab the instance
+  ||| in the record too.
   WorkflowMonadInstance
     : (w : context.Workflow) -> Monad (WorkflowMonad w)
+  
+  ||| Every command of the bounded context determines its workflow, it is
+  ||| enough to associate the workflow with its morphism that implements
+  ||| the worklflow in its monad.
   workflowMorphism
     : (cmd : context.Command) ->
       let w = context.workflowOf cmd
           d = Workflow w
-      in Morphism (WorkflowMonad w) (State d) (WorkflowEnv.Command d) (Branch d)
+      in Morphism (WorkflowMonad w) (state d) (WorkflowEnv.Command d) (Branch d)
+  
+  ||| Create an embedding from the command. This could instanciate
+  ||| new embedding for the workflow every time when a new command
+  ||| arrives.
   createWorkflowEmbedding
     : (cmd : context.Command) ->
       let w = context.workflowOf cmd
       in monad (Embedding (WorkflowMonad w) (ErrorData w) monad)
-  createWorkflowEvent
+  
+  ||| Transforms the result of a workflow into the event of the workflow.
+  ||| Computation may happen during the transformation.
+  transformWorkflowResult
+    : (cmd : context.Command) ->
+      let morphism = workflowMorphism cmd
+      in morphism.StateType (WorkflowEnv.end (Workflow (context.workflowOf cmd))) -> monad (EventData (context.eventOf cmd))
+  
+  ||| Transforms the event information that comes from the execution of the workflow
+  ||| into the Event of the bounded context.
+  ||| Computation may happen during the transformation.
+  transformEvent
+    : (cmd : context.Command) -> EventData (context.eventOf cmd) -> monad ContextEvent
+  
+  ||| Creates a command from the command information.
+  |||
+  ||| The entry point of a bounded context is a command. We get the command
+  ||| from the external world, that is the public API of the bounded context,
+  ||| but that command needs to parsed, understood in terms of the internal
+  ||| commands, and information which is needed by the workflow.
+  createCommand
+    : ContextCommand -> monad (cmd : context.Command ** WorkflowEntry (context.workflowOf cmd))
+  
+  ||| Creates a start state of the workflow from command, which
+  ||| was extracted from the command data of the bounded context.
+  ||| Creation of the start state related information of the workflow
+  ||| may happen as part a computation.
+  createStartState
     : (cmd : context.Command) ->
       let m = workflowMorphism cmd
-      in m.StateType (WorkflowEnv.end (Workflow (context.workflowOf cmd))) -> monad (EventData (context.eventOf cmd))
-  createFinalEvent
-    : (cmd : context.Command) -> EventData (context.eventOf cmd) -> monad ContextEvent
-  createCommand
-    : ContextCommand -> monad (cmd : context.Command ** Command cmd)
-  createStartState
-    : (cmd : context.Command) -> Command cmd -> 
-      let m = workflowMorphism cmd
-      in monad (m.StateType (WorkflowEnv.start (Workflow (context.workflowOf cmd))))
-  createFinalError
+      in WorkflowEntry (context.workflowOf cmd) -> monad (m.StateType (WorkflowEnv.start (Workflow (context.workflowOf cmd))))
+  
+  ||| Transform the error information that comes from the execution of the workflow
+  ||| into the Error of the boundedContext.
+  ||| Computation may happend during the transformation of this information.
+  transformError
     : (w : context.Workflow) -> (ErrorData w) -> monad ContextError
 
 ||| Execute a command with the given bounded context.
@@ -194,9 +250,9 @@ execute bc contextCommand = do
   workflowRunner <- bc.createWorkflowEmbedding cmd
   let workflowMonadInstance = bc.WorkflowMonadInstance (bc.context.workflowOf cmd) -- For transformWorkflow
   input  <- bc.createStartState cmd cmdData
-  result <- runEmbedding workflowRunner (transformWorkflow (bc.Workflow (bc.context.workflowOf cmd)) (bc.workflowMorphism cmd) input)
+  result <- unwrapEmbedding workflowRunner (transformWorkflow (bc.Workflow (bc.context.workflowOf cmd)) (bc.workflowMorphism cmd) input)
   case result of
-    Left err => map Left (bc.createFinalError (bc.context.workflowOf cmd) err)
-    Right wfVal => do
-      evVal <- bc.createWorkflowEvent cmd wfVal
-      map Right (bc.createFinalEvent cmd evVal)
+    Left err => map Left (bc.transformError (bc.context.workflowOf cmd) err)
+    Right eventData => do
+      workflowEvent <- bc.transformWorkflowResult cmd eventData
+      map Right (bc.transformEvent cmd workflowEvent)
