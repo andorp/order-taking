@@ -241,18 +241,103 @@ record BoundedContextImplementation (monad : Type -> Type) where
 ||| and execute the selected workflow in its monad, which is embeddeable to the
 ||| main monad of the bounded context handler. The result will be a bounded context
 ||| error or a bounded context event.
+-- 
+--   ┌───────────────────────────────────────────────────────────────┐
+--   │                                                               │
+--   │                                    ┌───────────────────────┐  │
+--   │                                    │         Start         │  │
+--   │                                    └───────────────────────┘  │
+--   │                                      │                        │
+--   │ cmd                                  │ context command        │
+--   ▼                                      ▼                        │
+-- ┌──────────────────┐  workflow entry   ┌────────────────────────────────────────────────────────────────────┐  cmd               ┌─────────────────────────┐
+-- │ createStartState │ ◀──────────────── │                                                                    │ ─────────────────▶ │ createWorkflowEmbedding │
+-- └──────────────────┘                   │                                                                    │                    └─────────────────────────┘
+--   │                                    │                                                                    │                      │
+--   │                                    │                           createCommand                            │                      │
+--   │                                    │                                                                    │                      │
+--   │                                    │                                                                    │                      │
+--   │                   ┌─────────────── │                                                                    │ ─┐                   │
+--   │                   │                └────────────────────────────────────────────────────────────────────┘  │                   │
+--   │                   │                  │                                          │                          │                   │
+--   │                   │                  │ cmd                                      │ cmd                      │                   │
+--   │                   │                  ▼                                          ▼                          │                   │
+--   │                   │                ┌───────────────────────┐                  ┌─────────────────────────┐  │                   │
+--   │                   │                │ bc.context.workflowOf │                  │   bc.workflowMorphism   │  │                   │
+--   │                   │                └───────────────────────┘                  └─────────────────────────┘  │                   │
+--   │ input             │                  │                                          │                          │                   │
+--   │                   │                  │ workflow                                 │                          │                   │
+--   │                   │                  ▼                                          │                          │                   │
+--   │                   │                ┌───────────────────────┐  morphism          │                          │                   │
+--   │                   │                │   transformWorkflow   │ ◀──────────────────┘                          │                   │
+--   │                   │                └───────────────────────┘                                               │                   │
+--   │                   │                  │                                                                     │                   │
+--   │                   │                  │ embedded workflow                                                   └───────────────────┼──────────────────────────┐
+--   │                   │                  ▼                                                                                         │                          │
+--   │                   │                ┌────────────────────────────────────────────────────────────────────┐  workflow runner     │                          │
+--   └───────────────────┼──────────────▶ │             unwrapEmbedding: Execute embedded workflow             │ ◀────────────────────┘                          │
+--                       │                └────────────────────────────────────────────────────────────────────┘                                                 │
+--                       │                  │                                          │                                                                         │
+--                       │ cmd              │ error                                    │ event data                                                              │
+--                       │                  ▼                                          ▼                                                                         │
+--                       │                ┌───────────────────────┐                  ┌─────────────────────────┐  cmd                                            │
+--                       └──────────────▶ │    transformError     │                  │ transformWorkflowResult │ ◀───────────────────────────────────────────────┘
+--                                        └───────────────────────┘                  └─────────────────────────┘
+--                                          │                                          │
+--                                          │ context error                            │
+--                                          ▼                                          │
+--                                        ┌───────────────────────┐  context event     │
+--                                        │     contextResult     │ ◀──────────────────┘
+--                                        └───────────────────────┘
+--                                          │
+--                                          │
+--                                          ▼
+--                                        ┌───────────────────────┐
+--                                        │          End          │
+--                                        └───────────────────────┘
+--
 export
 execute
   :  (Monad m)
   => (bc : BoundedContextImplementation m) -> bc.ContextCommand -> m (Either bc.ContextError bc.ContextEvent)
 execute bc contextCommand = do
-  (cmd ** cmdData) <- bc.createCommand contextCommand
+  (cmd ** workflowEntry) <- bc.createCommand contextCommand
   workflowRunner <- bc.createWorkflowEmbedding cmd
   let workflowMonadInstance = bc.WorkflowMonadInstance (bc.context.workflowOf cmd) -- For transformWorkflow
-  input  <- bc.createStartState cmd cmdData
-  result <- unwrapEmbedding workflowRunner (transformWorkflow (bc.Workflow (bc.context.workflowOf cmd)) (bc.workflowMorphism cmd) input)
+  input  <- bc.createStartState cmd workflowEntry
+  let embeddedWorkflow = transformWorkflow (bc.Workflow (bc.context.workflowOf cmd)) (bc.workflowMorphism cmd)
+  result <- unwrapEmbedding workflowRunner (embeddedWorkflow input)
   case result of
     Left err => map Left (bc.transformError (bc.context.workflowOf cmd) err)
     Right eventData => do
       workflowEvent <- bc.transformWorkflowResult cmd eventData
       map Right (bc.transformEvent cmd workflowEvent)
+
+-- NOTE: Graph definition
+
+{-
+digraph {
+	Start -> createCommand [ label = "context command" ];
+    createCommand -> createWorkflowEmbedding [ label = "cmd" ];
+    createCommand -> createStartState [ label = "cmd" ];
+    createCommand -> createStartState [ label = "workflow entry" ];
+    createCommand -> bc_context_workflowOf [ label = "cmd" ];
+    createCommand -> bc_workflowMorphism [ label = "cmd" ];
+    bc_context_workflowOf -> transformWorkflow [ label = "workflow" ];
+    bc_workflowMorphism -> transformWorkflow [ label = "morphism" ];
+    createWorkflowEmbedding -> unwrapEmbedding [ label = "workflow runner" ];
+    transformWorkflow -> unwrapEmbedding [ label = "embedded workflow" ];
+    createStartState -> unwrapEmbedding [ label = "input" ];
+    createCommand   -> transformError [ label = "cmd" ];
+    unwrapEmbedding -> transformError [ label = "error" ];
+    createCommand   -> transformWorkflowResult [ label = "cmd" ];
+    unwrapEmbedding -> transformWorkflowResult [ label = "event data" ];
+    transformError -> contextResult [ label = "context error" ];
+    transformWorkflowResult -> contextResult [ label = "context event" ];
+    contextResult -> End;
+    
+    unwrapEmbedding [ label = "unwrapEmbedding: Execute embedded workflow" ];
+    bc_context_workflowOf [ label = "bc.context.workflowOf" ];
+    bc_workflowMorphism [ label = "bc.workflowMorphism" ];   
+}
+-}
