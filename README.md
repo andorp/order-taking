@@ -31,6 +31,12 @@ libraries could be written.
 Request: Please consider buying both of the books mentioned above. Boths are excellent resources for
 further studying of the applied subject.
 
+## Financial Support
+
+<a href="https://www.patreon.com/AndOrP">
+<img src="https://c5.patreon.com/external/logo/become_a_patron_button.png" width="150"/>
+</a>
+
 ## Notes
 
 This project meant to be a blue-print, example for micro-services written in Idris. Its main focus is to reproduce
@@ -49,12 +55,6 @@ a hand-book for Idris development.
 ## High level overview
 
 See the [slides](https://github.com/andorp/order-taking/blob/main/SLIDES.md)
-
-## Support
-
-<a href="https://www.patreon.com/AndOrP">
-<img src="https://c5.patreon.com/external/logo/become_a_patron_button.png" width="150"/>
-</a>
 
 ## Run
 
