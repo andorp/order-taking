@@ -15,6 +15,7 @@ Idris via examples.
 - Service.NodeJS.Date
 - Service.NodeJS.Random
 - Service.NodeJS.MD5
+- Service.NodeJS.Promise
 - ...
 
 You may want to read the documentation from the modules in this order if you want to learn
