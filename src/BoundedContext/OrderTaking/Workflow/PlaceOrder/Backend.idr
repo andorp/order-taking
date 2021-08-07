@@ -187,7 +187,7 @@ namespace Model
   generateIdentifier md5 = do
     n <- Date.now
     d <- Random.double
-    idx <- MD5.create md5 (show n ++ show d)
+    idx <- md5.generate (show n ++ show d)
     putStrLn idx
     pure idx
 
