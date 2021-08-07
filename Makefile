@@ -2,8 +2,9 @@ idris2 = idris2
 node = node
 
 init: FORCE
-	test -d db    || mkdir db
-	test -d build || mkdir build
+	test -d db      || mkdir db
+	test -d build   || mkdir build
+	test -d service || mkdir service
 	touch service/order-taking-service.js
 
 typecheck: src order-taking-service.ipkg FORCE
