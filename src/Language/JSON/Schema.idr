@@ -83,6 +83,34 @@ namespace Indexed
       JLeft    : {l  : Schema}       -> JSON l       -> JSON (Either l r)
       JRight   : {r  : Schema}       -> JSON r       -> JSON (Either l r)
 
+    -- The 'All' type requires some explanation.
+    --
+    -- A proof that all elements of a list satisfy a property. It is a list of
+    -- proofs, corresponding element-wise to the `List`.
+    -- data All : (0 p : a -> Type) -> List a -> Type where
+    --   Nil  : All p Nil
+    --   (::) : {0 xs : List a} -> p x -> All p xs -> All p (x :: xs)
+    --
+    -- It is a list like construction, but also holds to a predicate (something that is 'a -> Type')
+    -- and applies creates a list using the predice applied to the list of its index 'xs'.
+    -- If the index of 'All' has type of 'List Type', and the predicate is the identity we
+    -- get the HList construction, which is able to store elements of different type, because we
+    -- have the information about which index has which type. Example;
+    -- 
+    -- hlist : HList [Int, Bool, Int]
+    -- hlist = [0,False,1] -- we can use syntactical sugar for list, because we have Nil and (::)
+    --
+    -- Another usecase for All is to create a list where the index represents index values for
+    -- a given indexed types, and we create a list of indexed values of the same indexed type.
+    -- In this case the JArray; All the elements of the JArray must be a JSON which requires
+    -- a schema as index, for that reason we have to have a list of indexes, and we can use
+    -- All to create a well-types list. For example
+    -- 
+    -- jarray : JSON (Array [Number, Boolean, Number])
+    -- jarray = JArray [JNumber 0, JBoolean False, JNumber 1]
+    -- 
+    -- Similarly as we done in the case of 'hlist' example.
+
     ||| Field in the JSON object.
     |||
     ||| The field must have name, its presence can optional and its value
@@ -206,6 +234,8 @@ namespace ObjectHasFieldProof
   getField {s} json f {ok} = getFieldSafe s json f ok
 
 mutual
+
+  ||| Forget about the schema index of the JSON and convert it to the non idexed JSON representation.
   export
   toNonIndexed : Indexed.JSON s -> Data.JSON
   toNonIndexed JNull        = JNull
@@ -229,6 +259,13 @@ mutual
 
 mutual
 
+  ||| Parse a non-indexed JSON with the given schema.
+  |||
+  ||| If the given non-indexed JSON fits the schema, we can create an indexed
+  ||| version of it. As schemas can be this parsing backtracks on schema
+  ||| Either constructions. During the creation of the indexed object, it is
+  ||| not required from the fields to have the same order as in the schema,
+  ||| leading to another search when the indexed object is assembled.
   export
   toIndexed : (s : Schema) -> Data.JSON -> Maybe (Indexed.JSON s)
   toIndexed Null          JNull        = Just JNull
