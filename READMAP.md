@@ -7,8 +7,8 @@ Idris via examples.
 
 - [Data.Result](https://github.com/andorp/order-taking/blob/main/src/Data/Result.idr)
 - [Data.Form](https://github.com/andorp/order-taking/blob/main/src/Data/Form.idr)
-- [Data.Between](https://github.com/andorp/order-taking/blob/main/src/Data.Between.idr)
-- [Data.StringN](https://github.com/andorp/order-taking/blob/main/src/Data.StringN.idr)
+- [Data.Between](https://github.com/andorp/order-taking/blob/main/src/Data/Between.idr)
+- [Data.StringN](https://github.com/andorp/order-taking/blob/main/src/Data/StringN.idr)
 - [Language.JSON.Schema](https://github.com/andorp/order-taking/blob/main/src/Language/JSON/Schema.idr)
 - [Rango.BoundedContext.Workflow](https://github.com/andorp/order-taking/blob/main/src/Rango/BoundedContext/Workflow.idr)
 - [Rango.BoundedContext.BoundedContext](https://github.com/andorp/order-taking/blob/main/src/Rango/BoundedContext/BoundedContext.idr)
