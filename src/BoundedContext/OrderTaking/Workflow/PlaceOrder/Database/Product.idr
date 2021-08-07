@@ -98,9 +98,8 @@ productPrice (MkProductCodeDTO productCode) = do
               $ Rango.Database.SQLite.query db
               $ Select ["code", "description", "price"] productTable [("code", "=", "'\{productCode}'")]
     | Nothing => throwError $ ProductRetrieveError $ show productCode
-  let Just (Number ** JNumber d) = getField json "price"
-        | Just  _ => throwError $ ProductRetrieveError "price field should have number type."
-        | Nothing => throwError $ ProductRetrieveError "price field was not found in DB."
+  let (Number ** (JNumber d)) = getField json "price"
+      | _ => throwError $ ProductRetrieveError "price field has non Number type."
   pure d
 
 export

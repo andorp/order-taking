@@ -77,10 +77,10 @@ lampCheck IsBulbOut MkLightsOn = do
       putStrLn "No."
       pure (Left MkBrokenLamp)
 
-morphism : Morphism State IO Action Check
+morphism : Morphism IO State Action Check
 morphism = MkMorphism
   { StateType = lampStateRep
-  , command   = lampAction
+  , step      = lampAction
   , check     = lampCheck
   }
 
