@@ -39,7 +39,7 @@ further studying of the applied subject.
 
 ## Talk
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/QBj-4K-l-sg" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<a href="https://youtu.be/QBj-4K-l-sg">Youtube</a>
 
 ## Notes
 
