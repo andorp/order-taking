@@ -37,6 +37,10 @@ further studying of the applied subject.
 <img src="https://c5.patreon.com/external/logo/become_a_patron_button.png" width="150"/>
 </a>
 
+## Talk
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/QBj-4K-l-sg" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+
 ## Notes
 
 This project meant to be a blue-print, example for micro-services written in Idris. Its main focus is to reproduce
