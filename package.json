@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "google-closure-compiler": "^20210505.0.0",
+    "md5": "^2.3.0",
+    "sqlite": "^4.0.22",
+    "sqlite3": "^5.0.2",
+    "sqlite3-promisify": "^1.0.2"
+  }
+}
