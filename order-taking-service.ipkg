@@ -1,6 +1,6 @@
 package order-taking-service
 
-depends = idris2, contrib, network
+depends = contrib, network
 
 opts = "profile"
 
