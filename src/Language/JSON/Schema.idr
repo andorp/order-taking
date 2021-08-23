@@ -224,8 +224,8 @@ namespace ObjectHasFieldProof
   -- This function is total, because the indexes in the ObjectHasRequiredField determines that this function
   -- only be called with Object JSON, and rest of constructors don't need to be inspected.
   getFieldSafe : (s : Schema) -> JSON s -> (f : String) -> (1 ok : ObjectHasRequiredField f s) -> (z : Schema ** JSON z)
-  getFieldSafe (Object ((_, (Required, _)) ::  _)) x                  f Here      = MkDPair _ x
-  getFieldSafe (Object ((f1, (_, _))       :: fs)) (JObject (_ :: x)) f (There y) = getFieldSafe (Object fs) (JObject x) f y
+  getFieldSafe (Object ((_, (Required, y)) ::  _)) (JObject (RequiredField x :: _)) f Here      = (y ** x)
+  getFieldSafe (Object ((f1, (_, _))       :: fs)) (JObject (_      :: x))          f (There y) = getFieldSafe (Object fs) (JObject x) f y
 
   ||| Traverse the field of object and retrieve the JSON value of the field, alongside its Schema.  
   export
