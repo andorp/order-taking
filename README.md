@@ -65,6 +65,18 @@ a hand-book for Idris development.
 
 ## High level overview
 
+This repository contains more than just the `Idris` one to one translation of the `F#` code from the
+Domain Modeling Made Functional book. I wanted to show how Idris can be used to interface with existing
+`NodeJS` libraries. For that reason I added the following parts:
+
+- FFI for NodeJS interfacing libraries
+- Sketch of type-safe SQL library
+- Minimal scaffolding of a NodeJS server
+- Dependently typed framework for Bound-Context and Workflows
+- State transition of the PlaceOrder example
+- Free monadic DSL formalization of the PlaceOrder example
+- One backend implementation of the operations of PlaceOrder DSL
+
 See the [slides](https://github.com/andorp/order-taking/blob/main/SLIDES.md)
 
 ## Run
