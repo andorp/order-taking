@@ -31,6 +31,13 @@ libraries could be written.
 Request: Please consider buying both of the books mentioned above. Boths are excellent resources for
 further studying of the applied subject.
 
+## Work In Progress parts:
+
+- The documentation is still under development. Please come back regurarly to see what changed.
+- Client needs lots of improvements.
+- Better error Handling around workflow runners.
+- Dependently driven testing needs to be implemented.
+
 ## Financial Support
 
 <a href="https://www.patreon.com/AndOrP">
