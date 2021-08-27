@@ -94,13 +94,11 @@ export
 productPrice : ProductCodeDTO -> ProductDB Double
 productPrice (MkProductCodeDTO productCode) = do
   db <- ask
-  Just json  <- throwOnError ProductRetrieveError
-              $ Rango.Database.SQLite.query db
-              $ Select ["code", "description", "price"] productTable [("code", "=", "'\{productCode}'")]
+  Just json <- throwOnError ProductRetrieveError
+             $ Rango.Database.SQLite.query db
+             $ Select ["price"] productTable [("code", "=", "'\{productCode}'")]
     | Nothing => throwError $ ProductRetrieveError $ show productCode
-  let (Number ** (JNumber d)) = getField json "price"
-      | _ => throwError $ ProductRetrieveError "price field has non Number type."
-  pure d
+  pure (getField json "price")
 
 export
 initDB : IO ()

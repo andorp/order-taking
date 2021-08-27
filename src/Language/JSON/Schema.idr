@@ -122,6 +122,36 @@ namespace Indexed
       ||| Optional field in the JSON object; the value can be absent.
       OptionalField : {f : String} -> Maybe (JSON s) -> Field (f,Optional,s)
 
+namespace SimpleValue
+
+  ||| Associates a simple Idris Type with the schema.
+  |||
+  ||| With this mapping, interfacing with other parts of the
+  ||| code is easier as no need for explicit JSON processing.
+  ||| The main motivation here is the SQLite Select processing.
+  public export
+  SimpleType : Schema -> Type
+  SimpleType Null = ()
+  SimpleType Boolean = Bool
+  SimpleType Number = Double
+  SimpleType Str = String
+  SimpleType (Array xs) = All JSON xs
+  SimpleType (Object xs) = All Field xs
+  SimpleType (Either x y) = Either (SimpleType x) (SimpleType y)
+
+  ||| Convert a schema indexed JSON to its correspondence SimpleType value.
+  export
+  getSimpleValue : JSON s -> SimpleType s
+  getSimpleValue JNull = ()
+  getSimpleValue (JBoolean x) = x
+  getSimpleValue (JNumber x) = x
+  getSimpleValue (JString x) = x
+  getSimpleValue (JArray xs) = xs
+  getSimpleValue (JObject x) = x
+  getSimpleValue (JLeft x) = Left (getSimpleValue x)
+  getSimpleValue (JRight x) = Right (getSimpleValue x)
+
+
 -- Our first constuctive proof like tool.
 --
 -- When we write a function that extracts a field from a JSON, lets call it
@@ -208,29 +238,34 @@ namespace ObjectHasFieldProof
   ||| NOTE: These constructions should be optimized to a simple integer index by the Idris compiler.
   public export
   data ObjectHasRequiredField : (0 f : String) -> (0 s : Schema) -> Type where
-    Here  :                                          ObjectHasRequiredField f  (Object ((f,Required,_) :: _ ))
+    Here  : (z : Schema)                          -> ObjectHasRequiredField f  (Object ((f,Required,z) :: _ ))
     There : ObjectHasRequiredField f0 (Object fs) -> ObjectHasRequiredField f0 (Object ((f1,_,_)       :: fs))
 
   ||| Find the ObjectHasRequiredField, which is equivalent to the index of the element in the fields of Object.
   export
   hasJSONField : (f : String) -> (s : Schema) -> Maybe (ObjectHasRequiredField f s)
-  hasJSONField f (Object ((x, Required, _) :: xs)) = case decEq f x of
-    Yes f_is_x => Just (rewrite f_is_x in Here)
+  hasJSONField f (Object ((x, Required, z) :: xs)) = case decEq f x of
+    Yes f_is_x => Just (rewrite f_is_x in (Here z))
     No contra  => map There (hasJSONField f (Object xs))
   hasJSONField f _ = Nothing
+
+  public export
+  GetFieldType : ObjectHasRequiredField f s -> Type
+  GetFieldType (Here z)  = SimpleType z
+  GetFieldType (There x) = GetFieldType x
 
   ||| Traverse the field of object and retrieve the JSON value of the field, alongside its Schema.
   total
   -- This function is total, because the indexes in the ObjectHasRequiredField determines that this function
   -- only be called with Object JSON, and rest of constructors don't need to be inspected.
-  getFieldSafe : (s : Schema) -> JSON s -> (f : String) -> (1 ok : ObjectHasRequiredField f s) -> (z : Schema ** JSON z)
-  getFieldSafe (Object ((_, (Required, y)) ::  _)) (JObject (RequiredField x :: _)) f Here      = (y ** x)
+  getFieldSafe : (s : Schema) -> JSON s -> (f : String) -> (1 ok : ObjectHasRequiredField f s) -> GetFieldType ok
+  getFieldSafe (Object ((_, (Required, y)) ::  _)) (JObject (RequiredField x :: _)) f (Here y)  = getSimpleValue x
   getFieldSafe (Object ((f1, (_, _))       :: fs)) (JObject (_      :: x))          f (There y) = getFieldSafe (Object fs) (JObject x) f y
 
   ||| Traverse the field of object and retrieve the JSON value of the field, alongside its Schema.  
   export
   -- Use implicit parameters where possible.
-  getField : {s : Schema} -> JSON s -> (f : String) -> {auto 1 ok : ObjectHasRequiredField f s} -> (z : Schema ** JSON z)
+  getField : {s : Schema} -> JSON s -> (f : String) -> {auto 1 ok : ObjectHasRequiredField f s} -> GetFieldType ok
   getField {s} json f {ok} = getFieldSafe s json f ok
 
 mutual
