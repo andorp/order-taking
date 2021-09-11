@@ -88,7 +88,7 @@ and open `localhost:5000` in a browser.
 
 ### Server
 
-Install Idris2, its version can be found in the VERSIONS file.
+Install Idris2 which version must match the one marketd the [VERSIONS](https://github.com/andorp/order-taking/blob/main/VERSIONS) file.
 
 For dependencies install `nodejs`, `npm` and packages:
 
@@ -102,6 +102,7 @@ To start the OrderTaking service, which will create the initial Sqlite DB and st
 the service on `127.0.0.1:3000`
 
 ```
+make init-db
 make start-opt
 ```
 
@@ -118,6 +119,10 @@ npm run dev
 ```
 
 Which starts the client in development mode, any changes in its code, will be picked up.
+
+Important note, use the `g21` as product code on the client side for testing. The client
+is very in pre-alpha state, best to open the developer console to see, what happens before and
+after submitting the order. I will work on these details soon.
 
 Have fun!
 
