@@ -88,7 +88,8 @@ and open `localhost:5000` in a browser.
 
 ### Server
 
-Install Idris2 which version must match the one marketd the [VERSIONS](https://github.com/andorp/order-taking/blob/main/VERSIONS) file.
+ * Install Idris2 which version must match the one marketd the [VERSIONS](https://github.com/andorp/order-taking/blob/main/VERSIONS) file. OR
+ * If you Idris2 release version installed, check out the corresponding tag from 0.4.0
 
 For dependencies install `nodejs`, `npm` and packages:
 
